@@ -16,8 +16,8 @@ if (isNil "AAS_Loaded_Modules") then { AAS_Loaded_Modules = []; };
 if (isNil "AAS_Theme_Registry") then {
     // Format: ["ThemeID", "Display Name", "Pager_PAA_Path", "Tablet_PAA_Path"]
     AAS_Theme_Registry = [
-        ["aas_modern", "Modern", "\aas\data\tacticalpager_modern.paa", "\aas\data\tablet.paa"],
-        ["aas_retro", "Retro", "\aas\data\tacticalpager_retro.paa", "\aas\data\tablet_retro.paa"]
+        ["aas_modern", "Modern", "\z\aas\addons\aas\data\tacticalpager_modern.paa", "\z\aas\addons\aas\data\tablet.paa"],
+        ["aas_retro", "Retro", "\z\aas\addons\aas\data\tacticalpager_retro.paa", "\z\aas\addons\aas\data\tablet_retro.paa"]
     ];
 };
 

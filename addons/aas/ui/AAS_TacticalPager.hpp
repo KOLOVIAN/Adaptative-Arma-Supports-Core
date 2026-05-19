@@ -15,13 +15,13 @@ class AAS_Pager_HUD {
             colorText[] = {1, 1, 1, 1}; 
             shadow = 0; // Disable engine-generated drop shadows
             
-            text = "\aas\data\tacticalpager_modern.paa"; 
+            text = "\z\aas\addons\aas\data\tacticalpager_modern.paa"; 
             
-            w = 0.316 * safezoneW;
-            h = 0.885 * safezoneH;
+            w = "0.316*safezoneW";
+            h = "0.885*safezoneH";
             // Shifted 5% right
-            x = safezoneX + safezoneW - (0.276 * safezoneW); 
-            y = safezoneY + 0.5 * safezoneH - (0.442 * safezoneH);
+            x = "safezoneX+safezoneW-(0.276 * safezoneW)"; 
+            y = "safezoneY+0.5*safezoneH-(0.442 * safezoneH)";
         };
     };
 
@@ -33,20 +33,20 @@ class AAS_Pager_HUD {
             sizeEx = 0.025; 
             colorText[] = {0, 0, 0, 1};
             colorBackground[] = {0, 0, 0, 0}; 
-            w = 0.101 * safezoneW;
-            h = 0.025 * safezoneH;
+            w = "0.101*safezoneW";
+            h = "0.025*safezoneH";
             // Shifted 5% right
-            x = safezoneX + safezoneW - (0.141 * safezoneW);
-            y = safezoneY + 0.475 * safezoneH;
+            x = "safezoneX+safezoneW-(0.141*safezoneW)";
+            y = "safezoneY+0.475*safezoneH";
         };
 
         class PagerListbox: RscListBox {
             idc = 1500;
-            w = 0.101 * safezoneW;
-            h = 0.064 * safezoneH;
+            w = "0.101*safezoneW";
+            h = "0.064*safezoneH";
             // Shifted 5% right
-            x = safezoneX + safezoneW - (0.167 * safezoneW);
-            y = safezoneY + 0.495 * safezoneH; 
+            x = "safezoneX+safezoneW-(0.167*safezoneW)";
+            y = "safezoneY+0.495*safezoneH"; 
             font = "RobotoCondensed"; 
             sizeEx = 0.028; 
             rowHeight = 0.03; 
