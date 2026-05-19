@@ -61,7 +61,7 @@ class Display3DEN {
 class CfgFunctions {
     class aas { 
         class supportScripts {
-            file = "aas\functions"; 
+            file = "\z\aas\addons\aas\functions"; 
             class initSettings {}; // <-- FIXED: Removed { preInit = 1; }
             class initClient { postInit = 1; }; 
             class initServer { postInit = 1; };
@@ -154,32 +154,32 @@ class CfgSounds {
     sounds[] = {};
     class AAS_Voice_Signal1 {
         name = "AAS_Voice_Signal1";
-        sound[] = {"\aas\sounds\hq_signal1.ogg", 1, 1}; 
+        sound[] = {"\z\aas\addons\aas\sounds\hq_signal1.ogg", 1, 1}; 
         titles[] = {};
     };
     class AAS_Voice_Signal2 {
         name = "AAS_Voice_Signal2";
-        sound[] = {"\aas\sounds\hq_signal2.ogg", 1, 1};
+        sound[] = {"\z\aas\addons\aas\sounds\hq_signal2.ogg", 1, 1};
         titles[] = {};
     };
     class AAS_Voice_Signal3 {
         name = "AAS_Voice_Signal3";
-        sound[] = {"\aas\sounds\hq_signal3.ogg", 1, 1};
+        sound[] = {"\z\aas\addons\aas\sounds\hq_signal3.ogg", 1, 1};
         titles[] = {};
     };
     class AAS_Voice_Supply {
         name = "AAS_Voice_Supply";
-        sound[] = {"\aas\sounds\hq_supply.ogg", 1, 1};
+        sound[] = {"\z\aas\addons\aas\sounds\hq_supply.ogg", 1, 1};
         titles[] = {};
     };
     class AAS_Voice_CAS {
         name = "AAS_Voice_CAS";
-        sound[] = {"\aas\sounds\hq_cas.ogg", 1, 1};
+        sound[] = {"\z\aas\addons\aas\sounds\hq_cas.ogg", 1, 1};
         titles[] = {};
     };
     class AAS_Voice_Reinf {
         name = "AAS_Voice_Reinf";
-        sound[] = {"\aas\sounds\hq_reinf.ogg", 1, 1};
+        sound[] = {"\z\aas\addons\aas\sounds\hq_reinf.ogg", 1, 1};
         titles[] = {};
     };
 };
@@ -189,6 +189,6 @@ class CfgSounds {
 // =======================================================
 class Extended_PreInit_EventHandlers {
     class AAS_Main_PreInit {
-        init = "call compile preprocessFileLineNumbers '\aas\functions\fn_initSettings.sqf'";
+        init = "call compile preprocessFileLineNumbers '\z\aas\addons\aas\functions\fn_initSettings.sqf'";
     };
 };

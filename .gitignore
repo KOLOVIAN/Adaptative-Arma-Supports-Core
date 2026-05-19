@@ -1,0 +1,8 @@
+.hemttout
+.log
+hemtt
+hemtt.exe
+*.biprivatekey
+.vscode
+/releases/*
+.hemttprivatekey
