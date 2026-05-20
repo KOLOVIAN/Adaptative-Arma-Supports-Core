@@ -1,7 +1,6 @@
 // functions/fn_serverCAS.sqf
 
-// We keep the 3rd parameter to absorb the remoteExec payload, but ignore the old Zeus override.
-// The 4th parameter is our new support tag.
+// We keep the 3rd parameter to absorb the remoteExec payload
 params ["_caller", "_dropPos", "_ignoredZeus", ["_casType", "HELI"]];
 
 private _playerSide = side group _caller;
@@ -142,11 +141,10 @@ if (_customLoadout isNotEqualTo false) then {
 _aircraft allowDamage false; 
 _aircraft flyInHeight _flightHeight;
 
-// --- SILENCE TRACKER ---
-_aircraft setVariable ["AAS_LastFireTime", serverTime];
+// Infinite Ammo Tracker: Prevents the AI from abandoning the AO to rearm
 _aircraft addEventHandler ["Fired", {
-    params ["_unit", "_weapon", "_muzzle", "_mode", "_ammo", "_magazine", "_projectile", "_gunner"];
-    _unit setVariable ["AAS_LastFireTime", serverTime];
+    params ["_unit"];
+    _unit setVehicleAmmo 1;
 }];
 
 { 
@@ -159,42 +157,32 @@ _aircraft addEventHandler ["Fired", {
     { _unit setSkill [_x, 1]; } forEach ["aimingAccuracy", "aimingShake", "aimingSpeed", "spotDistance", "spotTime", "commanding", "courage", "reloadSpeed"];
 } forEach crew _aircraft;
 
-// --- COMBAT BEHAVIOR ---
+
+// =========================================================================
+// --- 5. VANILLA COMBAT BEHAVIOR ---
+// =========================================================================
 private _wpAttack = _airGroup addWaypoint [_dropPos, 0];
 _airGroup setCombatMode "RED"; 
+_airGroup setBehaviour "COMBAT"; 
 
-if (_isGunship) then {
-    _airGroup setBehaviour "COMBAT"; 
-    
-    _wpAttack setWaypointType "LOITER";
-    if (_forceOrbit) then { _wpAttack setWaypointLoiterType "CIRCLE_L"; }; 
-    _wpAttack setWaypointLoiterRadius _loiterRadius;
-    _wpAttack setWaypointSpeed "LIMITED";
-    
-    // Lobotomize the pilot to strictly fly the loiter path
-    if (_forceOrbit) then {
-        private _pilot = driver _aircraft;
-        _pilot disableAI "TARGET";
-        _pilot disableAI "AUTOTARGET";
-        _pilot disableAI "WEAPONAIM";
+switch (_behaviorMode) do {
+    case 0: { 
+        _wpAttack setWaypointType "LOITER";
+        _wpAttack setWaypointLoiterRadius _loiterRadius;
+        _wpAttack setWaypointSpeed "NORMAL";
+        // Only apply Counter-Clockwise override if it is a gunship and the box is checked
+        if (_isGunship && _forceOrbit) then { 
+            _wpAttack setWaypointLoiterType "CIRCLE_L"; 
+        };
     };
-} else {
-    _airGroup setBehaviour "COMBAT";
-
-    switch (_behaviorMode) do {
-        case 0: { 
-            _wpAttack setWaypointType "LOITER";
-            _wpAttack setWaypointLoiterRadius _loiterRadius;
-            _wpAttack setWaypointSpeed "NORMAL";
-        };
-        case 1: { 
-            _wpAttack setWaypointType "SAD";
-            _wpAttack setWaypointSpeed "NORMAL";
-        };
+    case 1: { 
+        _wpAttack setWaypointType "SAD";
+        _wpAttack setWaypointSpeed "NORMAL";
     };
 };
 
 // --- ANTI-STUCK FAIL-SAFE THREAD ---
+// Ensures helicopters don't get stuck hovering over a tree forever
 if (!_isPlane && !_isGunship) then {
     [_aircraft] spawn {
         params ["_heli"];
@@ -219,79 +207,51 @@ if (!_isPlane && !_isGunship) then {
     };
 };
 
-// --- AGGRESSION & TARGETING THREAD ---
-[_aircraft, _airGroup, _dropPos, _playerSide, _isPlane, _behaviorMode, _isGunship, _loiterRadius] spawn {
-    params ["_aircraft", "_airGroup", "_dropPos", "_playerSide", "_isPlane", "_behavior", "_isGunship", "_loiterRadius"];
+// --- DATALINK & TARGETING REFRESHER THREAD (NEW) ---
+// Gently nudges the AI by feeding them enemy locations near the smoke grenade
+[_aircraft, _airGroup, _dropPos, _playerSide, _loiterRadius, _isPlane] spawn {
+    params ["_aircraft", "_airGroup", "_dropPos", "_playerSide", "_loiterRadius", "_isPlane"];
     
+    // Scan radius slightly larger than the orbit to catch edge targets
     private _scanRadius = _loiterRadius + 500;
-    private _lastTarget = objNull;
 
     while {alive _aircraft && {(_aircraft distance2D _dropPos) < 3500}} do {
         
-        // Infinite ammo to prevent reloading pauses
-        _aircraft setVehicleAmmo 1;
-        
+        // Find entities strictly around the DROP POS to keep them focused on the LZ
         private _targets = _dropPos nearEntities [["Man", "Car", "Tank", "Ship"], _scanRadius];
         private _validTargets = [];
         
         {
             if (side _x != _playerSide && {side _x != civilian} && {alive _x}) then {
-                _airGroup reveal [_x, 4]; 
                 _validTargets pushBack _x;
             };
         } forEach _targets;
 
         if (count _validTargets > 0) then {
             
-            private _sortedTargets = [_validTargets, [], { _x distance2D _aircraft }, "ASCEND"] call BIS_fnc_sortBy;
+            // Sort by distance to the drop position (Prioritize enemies closest to the caller's mark)
+            private _sortedTargets = [_validTargets, [], { _x distance2D _dropPos }, "ASCEND"] call BIS_fnc_sortBy;
             private _primaryTarget = _sortedTargets select 0;
             
-            if (_isGunship) then {
+            // Beam the target's exact position into the AI's brain (Max Knowledge = 4)
+            _airGroup reveal [_primaryTarget, 4];
+            
+            // Gently point the gunners/pilot toward the target to prompt an attack run
+            if (!_isPlane) then {
                 private _gunners = (crew _aircraft) - [driver _aircraft];
-                
-                if (_primaryTarget != _lastTarget || !alive _lastTarget) then {
-                    _gunners doTarget _primaryTarget;
-                    _gunners doFire _primaryTarget;
-                    _lastTarget = _primaryTarget;
-                };
-
-                // --- THE DEADLOCK BREAKER ---
-                private _lastFired = _aircraft getVariable ["AAS_LastFireTime", serverTime];
-                if (serverTime - _lastFired >= 10) then {
-                    
-                    {
-                        private _gunner = _x;
-                        private _turret = _aircraft unitTurret _gunner;
-                        private _weps = _aircraft weaponsTurret _turret;
-                        
-                        if (count _weps > 0) then {
-                            private _wep = selectRandom _weps;
-                            _gunner selectWeapon _wep;
-                            _aircraft fireAtTarget [_primaryTarget, _wep];
-                        };
-                    } forEach _gunners;
-
-                    _aircraft setVariable ["AAS_LastFireTime", serverTime];
-                    _lastTarget = objNull; 
-                };
-
+                _gunners doTarget _primaryTarget;
             } else {
-                (units _airGroup) doTarget _primaryTarget;
-                
-                // NOSE-ALIGN FIX (SAD MODE ONLY)
-                if (!_isPlane && {_behavior == 1} && {(_aircraft distance2D _primaryTarget) < 1000}) then {
-                    (driver _aircraft) doWatch _primaryTarget;
-                };
+                (driver _aircraft) doTarget _primaryTarget;
             };
         };
 
-        sleep 3; 
+        sleep 5; // Refresh the datalink every 5 seconds
     };
 };
 
 private _rtbTime = parseNumber AAS_RTB_CAS;
 
-// --- TIMING & BEHAVIOR THREAD ---
+// --- TIMING & EXTRACTION THREAD ---
 [_aircraft, _airGroup, _spawnPos, _rtbTime] spawn {
     params ["_aircraft", "_airGroup", "_spawnPos", "_rtbTime"];
 
