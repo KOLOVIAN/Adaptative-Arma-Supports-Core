@@ -181,13 +181,16 @@ private _fnc_parseClass = {
 
     // Apply strict immortality to vehicle and crew for transit
     _vehicle allowDamage false;
+    
+    // [FIX 1] Fixed the nested _x override issue by declaring _crewMember
     { 
-        _x allowDamage false; 
-        _x addRating 100000; 
-        [_x] joinSilent _vehGroup; 
+        private _crewMember = _x;
+        _crewMember allowDamage false; 
+        _crewMember addRating 100000; 
+        [_crewMember] joinSilent _vehGroup; 
         
         // Maximize AI skills
-        { _x setSkill [_forEachIndex, 1]; } forEach ["aimingAccuracy", "aimingShake", "aimingSpeed", "spotDistance", "spotTime", "commanding", "courage", "reloadSpeed"];
+        { _crewMember setSkill [_x, 1]; } forEach ["aimingAccuracy", "aimingShake", "aimingSpeed", "spotDistance", "spotTime", "commanding", "courage", "reloadSpeed"];
     } forEach crew _vehicle;
 
     // ==========================================
@@ -306,6 +309,7 @@ private _fnc_parseClass = {
             [_unit] joinSilent _reinfGroup; 
             _unit setCaptive false; 
 
+            // Infantry uses _unit instead of _x, so it doesn't conflict with the skill string array
             { _unit setSkill [_x, 1]; } forEach ["aimingAccuracy", "aimingShake", "aimingSpeed", "spotDistance", "spotTime", "commanding", "courage", "reloadSpeed"];
 
             _unit moveInCargo _vehicle;
@@ -316,8 +320,12 @@ private _fnc_parseClass = {
         _vehGroup setBehaviour "CARELESS"; 
         _vehGroup setCombatMode "BLUE";
         
+        // [FIX 2] disableAI expects an Object (Unit), not a Group. 
         if (_isAir) then {
-            { _vehGroup disableAI _x } forEach ["AUTOTARGET", "TARGET", "SUPPRESSION", "AUTOCOMBAT"];
+            {
+                private _aiFeature = _x;
+                { _x disableAI _aiFeature; } forEach (units _vehGroup);
+            } forEach ["AUTOTARGET", "TARGET", "SUPPRESSION", "AUTOCOMBAT"];
         };
 
         if (_isPara) then {
