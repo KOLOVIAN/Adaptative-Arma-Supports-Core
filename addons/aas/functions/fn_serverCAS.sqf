@@ -207,45 +207,23 @@ if (!_isPlane && !_isGunship) then {
     };
 };
 
-// --- DATALINK & TARGETING REFRESHER THREAD (NEW) ---
-// Gently nudges the AI by feeding them enemy locations near the smoke grenade
-[_aircraft, _airGroup, _dropPos, _playerSide, _loiterRadius, _isPlane] spawn {
-    params ["_aircraft", "_airGroup", "_dropPos", "_playerSide", "_loiterRadius", "_isPlane"];
+// --- DYNAMIC AWARENESS THREAD ---
+[_aircraft, _airGroup, _dropPos, _playerSide, _loiterRadius] spawn {
+    params ["_aircraft", "_airGroup", "_dropPos", "_playerSide", "_loiterRadius"];
     
-    // Scan radius slightly larger than the orbit to catch edge targets
-    private _scanRadius = _loiterRadius + 500;
-
-    while {alive _aircraft && {(_aircraft distance2D _dropPos) < 3500}} do {
-        
-        // Find entities strictly around the DROP POS to keep them focused on the LZ
-        private _targets = _dropPos nearEntities [["Man", "Car", "Tank", "Ship"], _scanRadius];
-        private _validTargets = [];
+    while {alive _aircraft} do {
+        // Find everything in a wide area around the target zone
+        private _targets = _dropPos nearEntities [["Man", "Car", "Tank", "Ship"], _loiterRadius + 500];
         
         {
+            // Only reveal non-friendly, non-civilian targets
             if (side _x != _playerSide && {side _x != civilian} && {alive _x}) then {
-                _validTargets pushBack _x;
+                // Instantly inject the target into their sensor data
+                _airGroup reveal [_x, 4]; 
             };
         } forEach _targets;
 
-        if (count _validTargets > 0) then {
-            
-            // Sort by distance to the drop position (Prioritize enemies closest to the caller's mark)
-            private _sortedTargets = [_validTargets, [], { _x distance2D _dropPos }, "ASCEND"] call BIS_fnc_sortBy;
-            private _primaryTarget = _sortedTargets select 0;
-            
-            // Beam the target's exact position into the AI's brain (Max Knowledge = 4)
-            _airGroup reveal [_primaryTarget, 4];
-            
-            // Gently point the gunners/pilot toward the target to prompt an attack run
-            if (!_isPlane) then {
-                private _gunners = (crew _aircraft) - [driver _aircraft];
-                _gunners doTarget _primaryTarget;
-            } else {
-                (driver _aircraft) doTarget _primaryTarget;
-            };
-        };
-
-        sleep 5; // Refresh the datalink every 5 seconds
+        sleep 5; // Refresh every 5 seconds to keep the "memory" fresh
     };
 };
 
