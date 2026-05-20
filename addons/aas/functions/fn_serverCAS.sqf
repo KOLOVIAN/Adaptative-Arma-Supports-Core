@@ -1,66 +1,89 @@
 // functions/fn_serverCAS.sqf
 
-// Added the third parameter that defaults to false for regular players
-params ["_caller", "_dropPos", ["_isZeusOverride", false]];
+// We keep the 3rd parameter to absorb the remoteExec payload, but ignore the old Zeus override.
+// The 4th parameter is our new support tag.
+params ["_caller", "_dropPos", "_ignoredZeus", ["_casType", "HELI"]];
 
-// Dynamically pull and parse the cooldown time from the CBA Settings
-private _cooldownTime = parseNumber AAS_Cooldown_CAS; 
-private _flightHeight = parseNumber AAS_Height_CAS; // Dynamic Height
-private _loiterRadius = parseNumber AAS_Loiter_CAS; // Dynamic Loiter Radius
 private _playerSide = side group _caller;
 
-// FIX: If a Virtual Zeus calls this, dynamically adopt the side of the nearest real player.
-if (_playerSide == sideLogic) then {
-    private _realPlayers = allPlayers select {side group _x != sideLogic};
-    
-    if (count _realPlayers > 0) then {
-        private _nearestPlayers = [_realPlayers, [], { _x distance2D _dropPos }, "ASCEND"] call BIS_fnc_sortBy;
-        _playerSide = side group (_nearestPlayers select 0); 
-    } else {
-        _playerSide = WEST; 
+// --- 0. DYNAMIC VARIABLE ASSIGNMENT ---
+private _airClassRaw = "";
+private _behaviorMode = 0;
+private _flightHeight = 150;
+private _loiterRadius = 400;
+private _costMultStr = "1.0";
+private _isGunship = false;
+private _isPlane = false;
+private _forceOrbit = false;
+
+// Map the correct CBA settings based on the tag passed from the client
+switch (_casType) do {
+    case "PLANE": {
+        _airClassRaw = AAS_CAS_Plane_Class;
+        _behaviorMode = AAS_CAS_Plane_Behavior;
+        _flightHeight = 400; // Planes need a safe baseline
+        _loiterRadius = 1500;
+        _costMultStr = AAS_CAS_Plane_CostMult;
+        _isPlane = true;
+    };
+    case "HELI": {
+        _airClassRaw = AAS_CAS_Heli_Class;
+        _behaviorMode = AAS_CAS_Heli_Behavior;
+        _flightHeight = parseNumber AAS_CAS_Heli_Height;
+        _loiterRadius = parseNumber AAS_CAS_Heli_Radius;
+        _costMultStr = AAS_CAS_Heli_CostMult;
+    };
+    case "GUNSHIP": {
+        _airClassRaw = AAS_CAS_Gunship_Class;
+        _behaviorMode = 0; // Gunships ALWAYS loiter
+        _flightHeight = parseNumber AAS_CAS_Gunship_Height;
+        _loiterRadius = parseNumber AAS_CAS_Gunship_Radius;
+        _costMultStr = AAS_CAS_Gunship_CostMult;
+        _forceOrbit = AAS_CAS_Gunship_Orbit;
+        _isGunship = true;
     };
 };
 
 // --- 1. COOLDOWN CHECK ---
+private _cooldownTime = parseNumber AAS_Cooldown_CAS; 
 private _lastUse = missionNamespace getVariable ["AAS_CAS_LastUseTime", -99999];
 
-if (!_isZeusOverride && {serverTime < (_lastUse + _cooldownTime)}) exitWith {
+if (serverTime < (_lastUse + _cooldownTime)) exitWith {
     private _timeLeft = round(((_lastUse + _cooldownTime) - serverTime) / 60);
     (format ["HQ: CAS on cooldown. Available in %1 mins.", _timeLeft]) remoteExec ["systemChat", _caller];
 };
 
 // --- 2. DYNAMIC ECONOMY CHECK ---
-private _econPass = true; // Assume true by default for Zeus
-
-if (!_isZeusOverride) then {
-    // Dynamically parsed from CBA settings based on the active global preset
-    private _cost = switch (AAS_Econ_Preset_Core) do {
-        case 0: { parseNumber AAS_Cost_CAS_Custom };
-        case 1: { parseNumber AAS_Cost_CAS_Antistasi };
-        case 2: { 
-            [
-                parseNumber AAS_Cost_CAS_KPLib_S, 
-                parseNumber AAS_Cost_CAS_KPLib_A, 
-                parseNumber AAS_Cost_CAS_KPLib_F
-            ] 
-        };
-        case 3: { parseNumber AAS_Cost_CAS_Overthrow };
-        case 4: { parseNumber AAS_Cost_CAS_Warlords };
-        case 5: { parseNumber AAS_Cost_CAS_DUWS };
-        case 6: { parseNumber AAS_Cost_CAS_Antistasi };
-        default { 0 };
+private _baseCost = switch (AAS_Econ_Preset_Core) do {
+    case 0: { parseNumber AAS_Cost_CAS_Custom };
+    case 1: { parseNumber AAS_Cost_CAS_Antistasi };
+    case 2: { 
+        [
+            parseNumber AAS_Cost_CAS_KPLib_S, 
+            parseNumber AAS_Cost_CAS_KPLib_A, 
+            parseNumber AAS_Cost_CAS_KPLib_F
+        ] 
     };
-    
-    // Call the Central Economy Manager to do the math and check the preset
-    _econPass = [_caller, _cost, AAS_Econ_Preset_Core, AAS_Econ_Code_CAS] call AAS_fnc_setEconomyPreset;
+    case 3: { parseNumber AAS_Cost_CAS_Overthrow };
+    case 4: { parseNumber AAS_Cost_CAS_Warlords };
+    case 5: { parseNumber AAS_Cost_CAS_DUWS };
+    case 6: { parseNumber AAS_Cost_CAS_Antistasi };
+    default { 0 };
 };
 
+private _finalCost = _baseCost;
+
+// Apply the CBA multiplier UNLESS it is KP Liberation (Preset 2)
+if (AAS_Econ_Preset_Core != 2) then {
+    _finalCost = round (_baseCost * (parseNumber _costMultStr));
+};
+
+// Call the Central Economy Manager
+private _econPass = [_caller, _finalCost, AAS_Econ_Preset_Core, AAS_Econ_Code_CAS] call AAS_fnc_setEconomyPreset;
 if (!_econPass) exitWith {};
 
 // --- 3. FINALIZE SUPPORT ---
-if (!_isZeusOverride) then {
-    missionNamespace setVariable ["AAS_CAS_LastUseTime", serverTime, true];
-};
+missionNamespace setVariable ["AAS_CAS_LastUseTime", serverTime, true];
 
 "HQ: Close Air Support near your position. Keep your heads down." remoteExec ["systemChat", _caller];
 "AAS_Voice_CAS" remoteExec ["playSound", _caller]; 
@@ -88,24 +111,14 @@ private _fnc_parseClass = {
 };
 
 // Parse Aircraft Class & Loadout safely
-private _airParsed = [AAS_Heli_CAS] call _fnc_parseClass;
+private _airParsed = [_airClassRaw] call _fnc_parseClass;
 private _airClass = _airParsed select 0;
 private _customLoadout = _airParsed select 1;
 
-// Determine if the user pasted a Plane instead of a Helicopter
-private _isPlane = _airClass isKindOf "Plane";
-
-// --- GUNSHIP IDENTIFICATION & GEOMETRY OVERRIDE ---
-private _isGunship = missionNamespace getVariable ["AAS_CAS_CounterClockwise", false];
-if (!_isGunship && {(_airClass isKindOf "V44_Base_F" || {_airClass find "AC130" > -1} || {_airClass find "Gunship" > -1})}) then {
-    _isGunship = true;
-};
-
-// Adjust spawn altitude to prevent collisions or guarantee depression angles
-if (_isPlane) then { _flightHeight = _flightHeight max 400; };
-if (_isGunship) then {
-    _flightHeight = 500; 
-    _loiterRadius = 1100; 
+// Failsafe: Detect if a user pasted a plane into a helicopter box
+if (!_isPlane && {_airClass isKindOf "Plane"}) then { 
+    _isPlane = true; 
+    if (!_isGunship) then { _flightHeight = _flightHeight max 400; };
 };
 
 _spawnPos set [2, _flightHeight]; 
@@ -115,8 +128,8 @@ private _airData = [_spawnPos, _spawnPos getDir _dropPos, _airClass, _playerSide
 private _aircraft = _airData select 0;
 private _airGroup = _airData select 2;
 
-// Inject forward momentum so planes don't instantly stall on spawn
-if (_isPlane) then {
+// Inject forward momentum so fixed-wing aircraft don't instantly stall
+if (_isPlane && !_isGunship) then {
     _aircraft setVelocityModelSpace [0, 150, 0]; // ~540 km/h push
 };
 
@@ -129,8 +142,7 @@ if (_customLoadout isNotEqualTo false) then {
 _aircraft allowDamage false; 
 _aircraft flyInHeight _flightHeight;
 
-// --- SILENCE TRACKER (NEW) ---
-// We initialize a timer and an Event Handler that constantly tracks when the gunship fires
+// --- SILENCE TRACKER ---
 _aircraft setVariable ["AAS_LastFireTime", serverTime];
 _aircraft addEventHandler ["Fired", {
     params ["_unit", "_weapon", "_muzzle", "_mode", "_ammo", "_magazine", "_projectile", "_gunner"];
@@ -143,37 +155,36 @@ _aircraft addEventHandler ["Fired", {
     _unit addRating 100000; 
     [_unit] joinSilent _airGroup;
     
-    // Maximize AI aiming stats so they actually hit what they shoot at
+    // Maximize AI aiming stats
     { _unit setSkill [_x, 1]; } forEach ["aimingAccuracy", "aimingShake", "aimingSpeed", "spotDistance", "spotTime", "commanding", "courage", "reloadSpeed"];
 } forEach crew _aircraft;
 
 // --- COMBAT BEHAVIOR ---
 private _wpAttack = _airGroup addWaypoint [_dropPos, 0];
-_airGroup setCombatMode "RED"; // Universal permission to fire
+_airGroup setCombatMode "RED"; 
 
 if (_isGunship) then {
-    // Gunships need COMBAT to shoot, but we will lobotomize the pilot manually
     _airGroup setBehaviour "COMBAT"; 
     
     _wpAttack setWaypointType "LOITER";
-    _wpAttack setWaypointLoiterType "CIRCLE_L"; // Force Counter-Clockwise
+    if (_forceOrbit) then { _wpAttack setWaypointLoiterType "CIRCLE_L"; }; 
     _wpAttack setWaypointLoiterRadius _loiterRadius;
     _wpAttack setWaypointSpeed "LIMITED";
     
-    // Completely disable the pilot's combat brain so he strictly flies the loiter path
-    private _pilot = driver _aircraft;
-    _pilot disableAI "TARGET";
-    _pilot disableAI "AUTOTARGET";
-    _pilot disableAI "WEAPONAIM";
+    // Lobotomize the pilot to strictly fly the loiter path
+    if (_forceOrbit) then {
+        private _pilot = driver _aircraft;
+        _pilot disableAI "TARGET";
+        _pilot disableAI "AUTOTARGET";
+        _pilot disableAI "WEAPONAIM";
+    };
 } else {
     _airGroup setBehaviour "COMBAT";
 
-    // Dynamically assign behavior based on CBA settings and Aircraft Type
-    switch (AAS_Behavior_CAS) do {
+    switch (_behaviorMode) do {
         case 0: { 
             _wpAttack setWaypointType "LOITER";
-            private _radius = if (_isPlane) then { _loiterRadius max 1500 } else { _loiterRadius };
-            _wpAttack setWaypointLoiterRadius _radius;
+            _wpAttack setWaypointLoiterRadius _loiterRadius;
             _wpAttack setWaypointSpeed "NORMAL";
         };
         case 1: { 
@@ -184,7 +195,6 @@ if (_isGunship) then {
 };
 
 // --- ANTI-STUCK FAIL-SAFE THREAD ---
-// Planes never get "stuck" hovering, so we only run this for helicopters
 if (!_isPlane && !_isGunship) then {
     [_aircraft] spawn {
         params ["_heli"];
@@ -209,17 +219,16 @@ if (!_isPlane && !_isGunship) then {
     };
 };
 
-// --- AGGRESSION & TARGETING THREAD (UPGRADED) ---
-[_aircraft, _airGroup, _dropPos, _playerSide, _isPlane, AAS_Behavior_CAS, _isGunship, _loiterRadius] spawn {
+// --- AGGRESSION & TARGETING THREAD ---
+[_aircraft, _airGroup, _dropPos, _playerSide, _isPlane, _behaviorMode, _isGunship, _loiterRadius] spawn {
     params ["_aircraft", "_airGroup", "_dropPos", "_playerSide", "_isPlane", "_behavior", "_isGunship", "_loiterRadius"];
     
-    // Set scan radius slightly larger than the orbit radius
     private _scanRadius = _loiterRadius + 500;
     private _lastTarget = objNull;
 
     while {alive _aircraft && {(_aircraft distance2D _dropPos) < 3500}} do {
         
-        // Infinite ammo forced directly into the weapon magazines to prevent reloading pauses
+        // Infinite ammo to prevent reloading pauses
         _aircraft setVehicleAmmo 1;
         
         private _targets = _dropPos nearEntities [["Man", "Car", "Tank", "Ship"], _scanRadius];
@@ -227,7 +236,6 @@ if (!_isPlane && !_isGunship) then {
         
         {
             if (side _x != _playerSide && {side _x != civilian} && {alive _x}) then {
-                // Maximize AI knowledge of the target instantly
                 _airGroup reveal [_x, 4]; 
                 _validTargets pushBack _x;
             };
@@ -241,7 +249,6 @@ if (!_isPlane && !_isGunship) then {
             if (_isGunship) then {
                 private _gunners = (crew _aircraft) - [driver _aircraft];
                 
-                // Normal AI Targeting
                 if (_primaryTarget != _lastTarget || !alive _lastTarget) then {
                     _gunners doTarget _primaryTarget;
                     _gunners doFire _primaryTarget;
@@ -249,8 +256,6 @@ if (!_isPlane && !_isGunship) then {
                 };
 
                 // --- THE DEADLOCK BREAKER ---
-                // FIX: Time threshold reduced to 10 seconds. 
-                // If 10 seconds have passed without a single shot fired from the vehicle:
                 private _lastFired = _aircraft getVariable ["AAS_LastFireTime", serverTime];
                 if (serverTime - _lastFired >= 10) then {
                     
@@ -259,17 +264,13 @@ if (!_isPlane && !_isGunship) then {
                         private _turret = _aircraft unitTurret _gunner;
                         private _weps = _aircraft weaponsTurret _turret;
                         
-                        // Force a random weapon selection to scramble the AI's frozen state
                         if (count _weps > 0) then {
                             private _wep = selectRandom _weps;
                             _gunner selectWeapon _wep;
-                            
-                            // Force an engine-level shot command directly at the target
                             _aircraft fireAtTarget [_primaryTarget, _wep];
                         };
                     } forEach _gunners;
 
-                    // Reset the timer and memory so they get a fresh 10-second window
                     _aircraft setVariable ["AAS_LastFireTime", serverTime];
                     _lastTarget = objNull; 
                 };
@@ -294,7 +295,7 @@ private _rtbTime = parseNumber AAS_RTB_CAS;
 [_aircraft, _airGroup, _spawnPos, _rtbTime] spawn {
     params ["_aircraft", "_airGroup", "_spawnPos", "_rtbTime"];
 
-    sleep 120;
+    sleep 120; // 2 minutes invulnerability window
 
     if (alive _aircraft) then {
         _aircraft allowDamage true;

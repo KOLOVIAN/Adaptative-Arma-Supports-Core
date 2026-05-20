@@ -1,8 +1,8 @@
 /*
     AAS-Core
     Core Client Initialization
-    Architecture: Modular Registry / Non-Blocking Pager UI / BASIC SUPPORTS Integration
-    Version: 5.6.0 (Infinite Submenus & Backward Compatibility Upgrade)
+    Architecture: Modular Registry / Non-Blocking Pager UI / MAIN SUPPORTS Integration
+    Version: 6.0.0 (Nested Submenus & Multiplier Upgrade)
 */
 
 if (!hasInterface) exitWith {};
@@ -33,11 +33,11 @@ AAS_fnc_getActiveThemeTextures = {
     [_themeData select 2, _themeData select 3]
 };
 
-// --- 2. DYNAMIC CONTENT GENERATOR (BASIC SUPPORTS) ---
+// --- 2. DYNAMIC CONTENT GENERATOR (MAIN SUPPORTS) ---
 AAS_fnc_refreshBasicSupports = {
-    private _basicStrikes = [];
+    private _mainStrikes = [];
 
-    // UPDATED: Now reads the new Core preset and handles KP Liberation strings
+    // Base Cost Parser
     private _getCost = {
         params ["_custom", "_antistasi", "_overthrow", "_warlords", "_duws", "_kpS", "_kpA", "_kpF"];
         switch (AAS_Econ_Preset_Core) do { 
@@ -58,33 +58,79 @@ AAS_fnc_refreshBasicSupports = {
         };
     };
 
-    // Pass the new specific cost box variables
+    // Grab raw base costs
     private _costSupply = [AAS_Cost_Supply_Custom, AAS_Cost_Supply_Antistasi, AAS_Cost_Supply_Overthrow, AAS_Cost_Supply_Warlords, AAS_Cost_Supply_DUWS, AAS_Cost_Supply_KPLib_S, AAS_Cost_Supply_KPLib_A, AAS_Cost_Supply_KPLib_F] call _getCost;
     private _costCAS    = [AAS_Cost_CAS_Custom, AAS_Cost_CAS_Antistasi, AAS_Cost_CAS_Overthrow, AAS_Cost_CAS_Warlords, AAS_Cost_CAS_DUWS, AAS_Cost_CAS_KPLib_S, AAS_Cost_CAS_KPLib_A, AAS_Cost_CAS_KPLib_F] call _getCost;
     private _costReinf  = [AAS_Cost_Reinf_Custom, AAS_Cost_Reinf_Antistasi, AAS_Cost_Reinf_Overthrow, AAS_Cost_Reinf_Warlords, AAS_Cost_Reinf_DUWS, AAS_Cost_Reinf_KPLib_S, AAS_Cost_Reinf_KPLib_A, AAS_Cost_Reinf_KPLib_F] call _getCost;
 
-    // UPDATED: Now safely handles both numbers (Standard) and Strings (KP Liberation)
+    // UI Formatting Helpers
+    private _applyMultiplier = {
+        params ["_baseCost", "_multSetting"];
+        if (_baseCost isEqualType "") exitWith { _baseCost }; // Bypasses KP Liberation strings
+        round (_baseCost * (parseNumber _multSetting))
+    };
+
     private _formatName = {
         params ["_baseName", "_cost"];
         if (_cost isEqualType "") exitWith { format ["%1 (%2)", _baseName, _cost] };
         if (_cost > 0) then { format ["%1 (%2)", _baseName, _cost] } else { _baseName };
     };
 
+    // --- 1. SUPPLY DROP ---
     if (serverTime >= ((missionNamespace getVariable ['AAS_SupplyDrop_LastUseTime', -99999]) + (parseNumber AAS_Cooldown_Supply))) then {
-        _basicStrikes pushBack [["SUPPLY DROP", _costSupply] call _formatName, { [_this select 0, _this select 1] remoteExec ["aas_fnc_serverSupplyDrop", 2]; }];
+        _mainStrikes pushBack [["SUPPLY DROP", _costSupply] call _formatName, { [_this select 0, _this select 1, false, "DEFAULT"] remoteExec ["aas_fnc_serverSupplyDrop", 2]; }];
     };
 
+    // --- 2. CLOSE AIR SUPPORT ---
     if (serverTime >= ((missionNamespace getVariable ['AAS_CAS_LastUseTime', -99999]) + (parseNumber AAS_Cooldown_CAS))) then {
-        _basicStrikes pushBack [["CAS STRIKE", _costCAS] call _formatName, { [_this select 0, _this select 1] remoteExec ["aas_fnc_serverCAS", 2]; }];
+        private _casMenu = [];
+        
+        _casMenu pushBack [["CAS Plane", [_costCAS, AAS_CAS_Plane_CostMult] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "PLANE"] remoteExec ["aas_fnc_serverCAS", 2]; }];
+        _casMenu pushBack [["CAS Helicopter", [_costCAS, AAS_CAS_Heli_CostMult] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "HELI"] remoteExec ["aas_fnc_serverCAS", 2]; }];
+        _casMenu pushBack [["Gunship", [_costCAS, AAS_CAS_Gunship_CostMult] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "GUNSHIP"] remoteExec ["aas_fnc_serverCAS", 2]; }];
+        
+        _mainStrikes pushBack ["CLOSE AIR SUPPORT", _casMenu];
     };
 
+    // --- 3. REINFORCEMENTS ---
     if (serverTime >= ((missionNamespace getVariable ['AAS_Reinf_LastUseTime', -99999]) + (parseNumber AAS_Cooldown_Reinf))) then {
-        _basicStrikes pushBack [["REINFORCEMENTS", _costReinf] call _formatName, { [_this select 0, _this select 1] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
+        private _reinfMenu = [];
+        
+        // Armor Submenu
+        private _armorMenu = [];
+        _armorMenu pushBack [["Light Armor", [_costReinf, AAS_Reinf_Armor_CostMult_Turret] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "ARMOR_TURRET"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
+        _armorMenu pushBack [["IFV", [_costReinf, AAS_Reinf_Armor_CostMult_APC] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "ARMOR_APC"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
+        _armorMenu pushBack [["Tank", [_costReinf, AAS_Reinf_Armor_CostMult_Tank] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "ARMOR_TANK"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
+        _reinfMenu pushBack ["ARMOR", _armorMenu];
+
+        // Airborne Submenu
+        private _airMenu = [];
+        _airMenu pushBack [["4-Man Squad (Heli)", [_costReinf, AAS_Reinf_Air_CostMult_4] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "AIR_4"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
+        _airMenu pushBack [["8-Man Squad (Heli)", [_costReinf, AAS_Reinf_Air_CostMult_8] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "AIR_8"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
+        _airMenu pushBack [["12-Man Squad (Paradrop)", [_costReinf, AAS_Reinf_Air_CostMult_12] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "AIR_12"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
+        _reinfMenu pushBack ["INFANTRY: AIRBORNE", _airMenu];
+
+        // Mechanized Submenu
+        private _mechMenu = [];
+        _mechMenu pushBack [["4-Man Squad (MRAP)", [_costReinf, AAS_Reinf_Ground_CostMult_4] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "MECH_4"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
+        _mechMenu pushBack [["8-Man Squad (APC)", [_costReinf, AAS_Reinf_Ground_CostMult_8] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "MECH_8"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
+        _mechMenu pushBack [["12-Man Squad (Truck)", [_costReinf, AAS_Reinf_Ground_CostMult_12] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "MECH_12"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
+        _reinfMenu pushBack ["INFANTRY: MECHANIZED", _mechMenu];
+        
+        _mainStrikes pushBack ["REINFORCEMENTS", _reinfMenu];
     };
 
+    // Update Registry & Rename dynamically if an old module pushed "BASIC SUPPORTS"
     private _found = false;
-    { if ((_x select 0) == "BASIC SUPPORTS") exitWith { _x set [1, _basicStrikes]; _found = true; }; } forEach AAS_Menu_Registry;
-    if (!_found) then { AAS_Menu_Registry insert [0, [["BASIC SUPPORTS", _basicStrikes]]]; };
+    { 
+        if ((_x select 0) == "MAIN SUPPORTS" || (_x select 0) == "BASIC SUPPORTS") exitWith { 
+            _x set [0, "MAIN SUPPORTS"]; 
+            _x set [1, _mainStrikes]; 
+            _found = true; 
+        }; 
+    } forEach AAS_Menu_Registry;
+    
+    if (!_found) then { AAS_Menu_Registry insert [0, [["MAIN SUPPORTS", _mainStrikes]]]; };
 };
 
 // --- 3. PAGER UI FUNCTIONS ---
@@ -388,7 +434,6 @@ AAS_fnc_openPager = {
 // --- 6. STARTUP NOTIFICATION ---
 [] spawn {
     sleep 2; 
-    // NEW: Check if the user has toggled on the startup message
     if (missionNamespace getVariable ["AAS_Show_Startup_Message", true]) then {
         private _moduleText = "";
         if (count AAS_Loaded_Modules > 0) then {
@@ -400,4 +445,4 @@ AAS_fnc_openPager = {
     };
 };
 
-diag_log "[AAS] Core initialized. VERSION 5.6.0 (Infinite Submenus Upgrade)";
+diag_log "[AAS] Core initialized. VERSION 6.0.0 (MORE SUPPORTS UPGRADE)";
