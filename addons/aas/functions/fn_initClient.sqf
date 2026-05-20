@@ -2,7 +2,7 @@
     AAS-Core
     Core Client Initialization
     Architecture: Modular Registry / Non-Blocking Pager UI / MAIN SUPPORTS Integration
-    Version: 6.0.0 (Nested Submenus & Multiplier Upgrade)
+    Version: 6.0.1 (Dynamic Split Cooldown UI Fix)
 */
 
 if (!hasInterface) exitWith {};
@@ -92,31 +92,41 @@ AAS_fnc_refreshBasicSupports = {
         _mainStrikes pushBack ["CLOSE AIR SUPPORT", _casMenu];
     };
 
-    // --- 3. REINFORCEMENTS ---
-    if (serverTime >= ((missionNamespace getVariable ['AAS_Reinf_LastUseTime', -99999]) + (parseNumber AAS_Cooldown_Reinf))) then {
-        private _reinfMenu = [];
-        
-        // Armor Submenu
+    // --- 3. REINFORCEMENTS (DYNAMIC SPLIT COOLDOWNS) ---
+    private _reinfMenu = [];
+    
+    // 3A. Armor Submenu Check
+    private _armorLastUse = missionNamespace getVariable ["AAS_Reinf_Armor_LastUseTime", -99999];
+    if (serverTime >= (_armorLastUse + (parseNumber AAS_Cooldown_Reinf_Armor))) then {
         private _armorMenu = [];
         _armorMenu pushBack [["Light Armor", [_costReinf, AAS_Reinf_Armor_CostMult_Turret] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "ARMOR_TURRET"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
         _armorMenu pushBack [["IFV", [_costReinf, AAS_Reinf_Armor_CostMult_APC] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "ARMOR_APC"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
         _armorMenu pushBack [["Tank", [_costReinf, AAS_Reinf_Armor_CostMult_Tank] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "ARMOR_TANK"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
         _reinfMenu pushBack ["ARMOR", _armorMenu];
+    };
 
-        // Airborne Submenu
+    // 3B. Airborne Submenu Check
+    private _airLastUse = missionNamespace getVariable ["AAS_Reinf_Air_LastUseTime", -99999];
+    if (serverTime >= (_airLastUse + (parseNumber AAS_Cooldown_Reinf_Air))) then {
         private _airMenu = [];
         _airMenu pushBack [["4-Man Squad (Heli)", [_costReinf, AAS_Reinf_Air_CostMult_4] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "AIR_4"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
         _airMenu pushBack [["8-Man Squad (Heli)", [_costReinf, AAS_Reinf_Air_CostMult_8] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "AIR_8"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
         _airMenu pushBack [["12-Man Squad (Paradrop)", [_costReinf, AAS_Reinf_Air_CostMult_12] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "AIR_12"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
         _reinfMenu pushBack ["INFANTRY: AIRBORNE", _airMenu];
+    };
 
-        // Mechanized Submenu
+    // 3C. Mechanized Submenu Check
+    private _mechLastUse = missionNamespace getVariable ["AAS_Reinf_Ground_LastUseTime", -99999];
+    if (serverTime >= (_mechLastUse + (parseNumber AAS_Cooldown_Reinf_Ground))) then {
         private _mechMenu = [];
         _mechMenu pushBack [["4-Man Squad (MRAP)", [_costReinf, AAS_Reinf_Ground_CostMult_4] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "MECH_4"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
         _mechMenu pushBack [["8-Man Squad (APC)", [_costReinf, AAS_Reinf_Ground_CostMult_8] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "MECH_8"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
         _mechMenu pushBack [["12-Man Squad (Truck)", [_costReinf, AAS_Reinf_Ground_CostMult_12] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "MECH_12"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
         _reinfMenu pushBack ["INFANTRY: MECHANIZED", _mechMenu];
-        
+    };
+    
+    // Only push REINFORCEMENTS to the main UI if at least ONE of the sub-categories is off cooldown!
+    if (count _reinfMenu > 0) then {
         _mainStrikes pushBack ["REINFORCEMENTS", _reinfMenu];
     };
 
@@ -160,7 +170,6 @@ AAS_fnc_updatePagerContent = {
             private _payload = _x select 1;
             
             // THE SECRET: SQF TYPE CHECKING FOR INFINITE DEPTH
-            // If the payload is an array, treat it as a folder. If it's code, treat it as a strike button.
             if (_payload isEqualType []) then {
                 _ctrl lbSetData [_idx, "AAS_CMD_SUBMENU_NESTED"];
             } else {
@@ -191,26 +200,21 @@ AAS_fnc_handlePagerSelection = {
     
     if (_cmd == "AAS_CMD_BACK") exitWith { 
         if (count AAS_Menu_Stack > 0) then {
-            // Pop the last menu data off the stack to go up one folder level
             private _previousMenu = AAS_Menu_Stack deleteAt (count AAS_Menu_Stack - 1);
             AAS_Current_Submenu_Data = _previousMenu;
             [false, AAS_Current_Submenu_Data] call AAS_fnc_updatePagerContent;
         } else {
-            // If the stack is empty, we must go back to the Root Main Menu
             [true] call AAS_fnc_updatePagerContent; 
         };
     };
 
     if (_cmd == "AAS_CMD_SUBMENU_MAIN") exitWith {
-        // Diving from Root Menu into a Module (e.g. Main Menu -> Artillery)
         AAS_Current_Submenu_Data = (AAS_Menu_Registry select _val) select 1;
         [false, AAS_Current_Submenu_Data] call AAS_fnc_updatePagerContent;
     };
 
     if (_cmd == "AAS_CMD_SUBMENU_NESTED") exitWith {
-        // Push the current array to our history stack so we can go 'BACK' to it later
         AAS_Menu_Stack pushBack AAS_Current_Submenu_Data;
-        // Dive into the selected sub-folder
         AAS_Current_Submenu_Data = (AAS_Current_Submenu_Data select _val) select 1;
         [false, AAS_Current_Submenu_Data] call AAS_fnc_updatePagerContent;
     };
@@ -263,7 +267,6 @@ AAS_fnc_openPager = {
     // --- DYNAMIC TEXTURE SWAP ---
     private _bgCtrl = _pagerDisplay displayCtrl 1200;
     if (!isNull _bgCtrl) then {
-        // Fetch the active texture array and grab index 0 (The Pager Texture)
         private _themeTextures = call AAS_fnc_getActiveThemeTextures;
         _bgCtrl ctrlSetText (_themeTextures select 0);
     };
@@ -445,4 +448,4 @@ AAS_fnc_openPager = {
     };
 };
 
-diag_log "[AAS] Core initialized. VERSION 6.0.0 (MORE SUPPORTS UPGRADE)";
+diag_log "[AAS] Core initialized. VERSION 6.0.0 (EXTRA SUPPORTS)";
