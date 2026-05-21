@@ -192,7 +192,6 @@ switch (_behaviorMode) do {
 };
 
 // --- ANTI-STUCK FAIL-SAFE THREAD ---
-// Ensures helicopters don't get stuck hovering over a tree forever
 if (!_isPlane && !_isGunship) then {
     [_aircraft] spawn {
         params ["_heli"];
@@ -217,33 +216,34 @@ if (!_isPlane && !_isGunship) then {
     };
 };
 
-// --- DYNAMIC AWARENESS THREAD (CONDITIONAL) ---
+// --- DYNAMIC AWARENESS THREAD (CONDITIONAL VANILLA DATALINK) ---
 [_aircraft, _airGroup, _dropPos, _playerSide, _loiterRadius] spawn {
-    params ["_aircraft", "_airGroup", "_dropPos", "_playerSide", "_loiterRadius"];
+    params ["_aircraft", "_airGroup", "_dropPos", "_playerSide", _loiterRadius"];
     
-    // Capture the exact time the aircraft was spawned
     private _spawnTime = serverTime;
     
     while {alive _aircraft} do {
         private _lastFireTime = _aircraft getVariable ["AAS_LastFireTime", serverTime];
         
-        // CONDITION: Must be alive for > 3 minutes (180s) AND must not have fired for > 40s
+        // CONDITION: Spawner for > 3 minutes (180s) AND no shots fired for > 40s
         if (serverTime >= (_spawnTime + 180) && {serverTime >= (_lastFireTime + 40)}) then {
             
-            // Find everything in a wide area around the target zone
             private _targets = _dropPos nearEntities [["Man", "Car", "Tank", "Ship"], _loiterRadius + 500];
             
             {
-                // Reveal non-friendly, non-civilian, non-hidden targets
                 if (side _x != _playerSide && {side _x != civilian} && {alive _x} && {!isObjectHidden _x}) then {
-                    // Instantly inject the target into their sensor data
+                    // 1. Reveal to group memory
                     _airGroup reveal [_x, 4]; 
+                    
+                    // 2. Broadcast via Datalink directly to vehicle hardware sensors
+                    _aircraft reportRemoteTarget [_x, 360];
+                    _aircraft confirmVehicleTarget [_x, true];
                 };
             } forEach _targets;
             
         };
 
-        sleep 5; // Check conditions every 5 seconds
+        sleep 5; 
     };
 };
 
