@@ -11,11 +11,6 @@ class CfgPatches {
             "cba_settings",
             "3DEN" // Forces mod to load AFTER the Eden Editor
         }; 
-        units[] = {
-            "AAS_Module_CAS", 
-            "AAS_Module_Reinf", 
-            "AAS_Module_Supply"
-        };
         weapons[] = {};
     };
 };
@@ -69,9 +64,6 @@ class CfgFunctions {
             class serverReinforcements {};
             class serverSupplyDrop {};
             class setEconomyPreset {}; 
-            class moduleCAS {};
-            class moduleReinf {};
-            class moduleSupply {};
             class edenExport {}; // Registered the exporter
         };
     };
@@ -88,46 +80,6 @@ class CfgFactionClasses {
     };
 };
 
-class CfgVehicles {
-    class Logic;
-    class Module_F: Logic {
-        class AttributesBase;
-        class ModuleDescription;
-    };
-    class AAS_Module_CAS: Module_F {
-        scope = 2;
-        scopeCurator = 2;
-        displayName = "Call CAS Strike";
-        category = "NOSEL_AAS_Category";
-        function = "aas_fnc_moduleCAS"; 
-        functionPriority = 1;
-        isGlobal = 0; 
-        isTriggerActivated = 0;
-        isDisposable = 1; 
-    };
-    class AAS_Module_Reinf: Module_F {
-        scope = 2;
-        scopeCurator = 2;
-        displayName = "Call Reinforcements";
-        category = "NOSEL_AAS_Category";
-        function = "aas_fnc_moduleReinf"; 
-        functionPriority = 1;
-        isGlobal = 0; 
-        isTriggerActivated = 0;
-        isDisposable = 1; 
-    };
-    class AAS_Module_Supply: Module_F {
-        scope = 2;
-        scopeCurator = 2;
-        displayName = "Call Supply Drop";
-        category = "NOSEL_AAS_Category";
-        function = "aas_fnc_moduleSupply"; 
-        functionPriority = 1;
-        isGlobal = 0; 
-        isTriggerActivated = 0;
-        isDisposable = 1; 
-    };
-};
 
 // =======================================================
 // --- REMOTE EXECUTION ---

@@ -141,10 +141,14 @@ if (_customLoadout isNotEqualTo false) then {
 _aircraft allowDamage false; 
 _aircraft flyInHeight _flightHeight;
 
-// Infinite Ammo Tracker: Prevents the AI from abandoning the AO to rearm
+// Initialize the fire timer immediately upon spawn
+_aircraft setVariable ["AAS_LastFireTime", serverTime];
+
+// Infinite Ammo Tracker & Fire Timer Update
 _aircraft addEventHandler ["Fired", {
     params ["_unit"];
     _unit setVehicleAmmo 1;
+    _unit setVariable ["AAS_LastFireTime", serverTime];
 }];
 
 { 
@@ -164,6 +168,12 @@ _aircraft addEventHandler ["Fired", {
 private _wpAttack = _airGroup addWaypoint [_dropPos, 0];
 _airGroup setCombatMode "RED"; 
 _airGroup setBehaviour "COMBAT"; 
+
+// Gunship Pilot Lobotomy: Forces the gunship to NEVER break the loiter path to attack
+if (_isGunship) then {
+    private _pilot = driver _aircraft;
+    { _pilot disableAI _x } forEach ["TARGET", "AUTOTARGET", "AUTOCOMBAT", "WEAPONAIM"];
+};
 
 switch (_behaviorMode) do {
     case 0: { 
@@ -207,23 +217,33 @@ if (!_isPlane && !_isGunship) then {
     };
 };
 
-// --- DYNAMIC AWARENESS THREAD ---
+// --- DYNAMIC AWARENESS THREAD (CONDITIONAL) ---
 [_aircraft, _airGroup, _dropPos, _playerSide, _loiterRadius] spawn {
     params ["_aircraft", "_airGroup", "_dropPos", "_playerSide", "_loiterRadius"];
     
+    // Capture the exact time the aircraft was spawned
+    private _spawnTime = serverTime;
+    
     while {alive _aircraft} do {
-        // Find everything in a wide area around the target zone
-        private _targets = _dropPos nearEntities [["Man", "Car", "Tank", "Ship"], _loiterRadius + 500];
+        private _lastFireTime = _aircraft getVariable ["AAS_LastFireTime", serverTime];
         
-        {
-            // Only reveal non-friendly, non-civilian targets
-            if (side _x != _playerSide && {side _x != civilian} && {alive _x}) then {
-                // Instantly inject the target into their sensor data
-                _airGroup reveal [_x, 4]; 
-            };
-        } forEach _targets;
+        // CONDITION: Must be alive for > 3 minutes (180s) AND must not have fired for > 40s
+        if (serverTime >= (_spawnTime + 180) && {serverTime >= (_lastFireTime + 40)}) then {
+            
+            // Find everything in a wide area around the target zone
+            private _targets = _dropPos nearEntities [["Man", "Car", "Tank", "Ship"], _loiterRadius + 500];
+            
+            {
+                // Reveal non-friendly, non-civilian, non-hidden targets
+                if (side _x != _playerSide && {side _x != civilian} && {alive _x} && {!isObjectHidden _x}) then {
+                    // Instantly inject the target into their sensor data
+                    _airGroup reveal [_x, 4]; 
+                };
+            } forEach _targets;
+            
+        };
 
-        sleep 5; // Refresh every 5 seconds to keep the "memory" fresh
+        sleep 5; // Check conditions every 5 seconds
     };
 };
 
