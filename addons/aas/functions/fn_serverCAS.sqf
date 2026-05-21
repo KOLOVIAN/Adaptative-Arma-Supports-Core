@@ -173,6 +173,97 @@ _airGroup setBehaviour "COMBAT";
 if (_isGunship) then {
     private _pilot = driver _aircraft;
     { _pilot disableAI _x } forEach ["TARGET", "AUTOTARGET", "AUTOCOMBAT", "WEAPONAIM"];
+
+    // --- PHANTOM VEHICLE TARGETING THREAD ---
+    [_aircraft, _airGroup, _dropPos, _loiterRadius] spawn {
+        params ["_aircraft", "_airGroup", "_dropPos", "_loiterRadius"];
+
+        private _friendlySide = side _airGroup;
+        private _scanRadius = _loiterRadius * 1.2;
+        private _pilot = driver _aircraft;
+        private _gunners = crew _aircraft select { _x != _pilot };
+        private _phantoms = [];
+
+        while {alive _aircraft} do {
+            sleep 5;
+
+            private _enemies = (_dropPos nearEntities [["Man"], _scanRadius]) select {
+                alive _x && { _friendlySide getFriend (side _x) < 0.6 }
+            };
+
+            if (count _enemies > 0) then {
+                private _target = _enemies select 0;
+                { if (_x distance2D _dropPos < _target distance2D _dropPos) then { _target = _x; }; } forEach _enemies;
+
+                // One phantom per gunner, slightly offset so AI treats them as separate targets
+                {
+                    private _idx = _forEachIndex;
+                    private _gunner = _x;
+                    private _offset = [(_idx * 15), 0, 0];
+                    private _phantomPos = (getPos _target) vectorAdd _offset;
+
+                    if (_idx >= count _phantoms || { isNull (_phantoms select _idx) }) then {
+                        private _p = createVehicle ["O_MRAP_02_F", _phantomPos, [], 0, "NONE"];
+                        _p allowDamage false;
+                        _p engineOn false;
+                        _p hideObjectGlobal true;
+                        [_p] joinSilent (group _target);
+                        createVehicleCrew _p;
+                        {
+                            _x allowDamage false;
+                            _x hideObjectGlobal true;
+                        } forEach crew _p;
+                        _phantoms set [_idx, _p];
+                    } else {
+                        (_phantoms select _idx) setPos _phantomPos;
+                    };
+
+                    _gunner doTarget (_phantoms select _idx);
+                } forEach _gunners;
+
+            } else {
+                // No infantry — clean up all phantoms
+                {
+                    if (!isNull _x) then {
+                        { deleteVehicle _x } forEach crew _x;
+                        deleteVehicle _x;
+                    };
+                } forEach _phantoms;
+                _phantoms = [];
+            };
+        };
+
+        // Final cleanup on RTB
+        {
+            if (!isNull _x) then {
+                { deleteVehicle _x } forEach crew _x;
+                deleteVehicle _x;
+            };
+        } forEach _phantoms;
+    };
+
+    // --- WEAPON CYCLING THREAD ---
+    [_aircraft] spawn {
+        params ["_aircraft"];
+
+        private _turrets = allTurrets [_aircraft, false] select { !(_x isEqualTo [-1]) };
+
+        while {alive _aircraft} do {
+            sleep 20;
+
+            {
+                private _turretPath = _x;
+                private _turretWeapons = _aircraft weaponsTurret _turretPath;
+
+                if (count _turretWeapons > 1) then {
+                    private _currentWeapon = _aircraft currentWeaponTurret _turretPath;
+                    private _currentIdx = _turretWeapons find _currentWeapon;
+                    private _nextIdx = (_currentIdx + 1) mod (count _turretWeapons);
+                    _aircraft selectWeaponTurret [(_turretWeapons select _nextIdx), _turretPath];
+                };
+            } forEach _turrets;
+        };
+    };
 };
 
 switch (_behaviorMode) do {
@@ -217,35 +308,6 @@ if (!_isPlane && !_isGunship) then {
     };
 };
 
-// --- DYNAMIC AWARENESS THREAD (CONDITIONAL) ---
-[_aircraft, _airGroup, _dropPos, _playerSide, _loiterRadius] spawn {
-    params ["_aircraft", "_airGroup", "_dropPos", "_playerSide", "_loiterRadius"];
-    
-    // Capture the exact time the aircraft was spawned
-    private _spawnTime = serverTime;
-    
-    while {alive _aircraft} do {
-        private _lastFireTime = _aircraft getVariable ["AAS_LastFireTime", serverTime];
-        
-        // CONDITION: Must be alive for > 3 minutes (180s) AND must not have fired for > 40s
-        if (serverTime >= (_spawnTime + 180) && {serverTime >= (_lastFireTime + 40)}) then {
-            
-            // Find everything in a wide area around the target zone
-            private _targets = _dropPos nearEntities [["Man", "Car", "Tank", "Ship"], _loiterRadius + 500];
-            
-            {
-                // Reveal non-friendly, non-civilian, non-hidden targets
-                if (side _x != _playerSide && {side _x != civilian} && {alive _x} && {!isObjectHidden _x}) then {
-                    // Instantly inject the target into their sensor data
-                    _airGroup reveal [_x, 4]; 
-                };
-            } forEach _targets;
-            
-        };
-
-        sleep 5; // Check conditions every 5 seconds
-    };
-};
 
 private _rtbTime = parseNumber AAS_RTB_CAS;
 
