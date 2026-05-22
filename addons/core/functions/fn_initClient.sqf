@@ -19,7 +19,7 @@ AAS_Active_Smoke = objNull;
 
 // --- UNIVERSAL THEME GETTER ---
 // Call this to receive: ["path\to\pager.paa", "path\to\tablet.paa"]
-AAS_fnc_getActiveThemeTextures = {
+aas_core_fnc_getActiveThemeTextures = {
     private _themeIndex = missionNamespace getVariable ["AAS_Pager_Theme", 0];
     
     // Failsafe: If the registry is empty or index is out of bounds, default to 0
@@ -34,7 +34,7 @@ AAS_fnc_getActiveThemeTextures = {
 };
 
 // --- 2. DYNAMIC CONTENT GENERATOR (MAIN SUPPORTS) ---
-AAS_fnc_refreshBasicSupports = {
+aas_core_fnc_refreshBasicSupports = {
     private _mainStrikes = [];
 
     // Base Cost Parser
@@ -78,16 +78,16 @@ AAS_fnc_refreshBasicSupports = {
 
     // --- 1. SUPPLY DROP ---
     if (serverTime >= ((missionNamespace getVariable ['AAS_SupplyDrop_LastUseTime', -99999]) + (parseNumber AAS_Cooldown_Supply))) then {
-        _mainStrikes pushBack [["SUPPLY DROP", _costSupply] call _formatName, { [_this select 0, _this select 1, false, "DEFAULT"] remoteExec ["aas_fnc_serverSupplyDrop", 2]; }];
+        _mainStrikes pushBack [["SUPPLY DROP", _costSupply] call _formatName, { [_this select 0, _this select 1, false, "DEFAULT"] remoteExec ["aas_core_fnc_serverSupplyDrop", 2]; }];
     };
 
     // --- 2. CLOSE AIR SUPPORT ---
     if (serverTime >= ((missionNamespace getVariable ['AAS_CAS_LastUseTime', -99999]) + (parseNumber AAS_Cooldown_CAS))) then {
         private _casMenu = [];
         
-        _casMenu pushBack [["CAS Plane", [_costCAS, AAS_CAS_Plane_CostMult] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "PLANE"] remoteExec ["aas_fnc_serverCAS", 2]; }];
-        _casMenu pushBack [["CAS Helicopter", [_costCAS, AAS_CAS_Heli_CostMult] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "HELI"] remoteExec ["aas_fnc_serverCAS", 2]; }];
-        _casMenu pushBack [["Gunship", [_costCAS, AAS_CAS_Gunship_CostMult] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "GUNSHIP"] remoteExec ["aas_fnc_serverCAS", 2]; }];
+        _casMenu pushBack [["CAS Plane", [_costCAS, AAS_CAS_Plane_CostMult] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "PLANE"] remoteExec ["aas_core_fnc_serverCAS", 2]; }];
+        _casMenu pushBack [["CAS Helicopter", [_costCAS, AAS_CAS_Heli_CostMult] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "HELI"] remoteExec ["aas_core_fnc_serverCAS", 2]; }];
+        _casMenu pushBack [["Gunship", [_costCAS, AAS_CAS_Gunship_CostMult] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "GUNSHIP"] remoteExec ["aas_core_fnc_serverCAS", 2]; }];
         
         _mainStrikes pushBack ["CLOSE AIR SUPPORT", _casMenu];
     };
@@ -99,9 +99,9 @@ AAS_fnc_refreshBasicSupports = {
     private _armorLastUse = missionNamespace getVariable ["AAS_Reinf_Armor_LastUseTime", -99999];
     if (serverTime >= (_armorLastUse + (parseNumber AAS_Cooldown_Reinf_Armor))) then {
         private _armorMenu = [];
-        _armorMenu pushBack [["Light Armor", [_costReinf, AAS_Reinf_Armor_CostMult_Turret] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "ARMOR_TURRET"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
-        _armorMenu pushBack [["IFV", [_costReinf, AAS_Reinf_Armor_CostMult_APC] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "ARMOR_APC"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
-        _armorMenu pushBack [["Tank", [_costReinf, AAS_Reinf_Armor_CostMult_Tank] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "ARMOR_TANK"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
+        _armorMenu pushBack [["Light Armor", [_costReinf, AAS_Reinf_Armor_CostMult_Turret] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "ARMOR_TURRET"] remoteExec ["aas_core_fnc_serverReinforcements", 2]; }];
+        _armorMenu pushBack [["IFV", [_costReinf, AAS_Reinf_Armor_CostMult_APC] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "ARMOR_APC"] remoteExec ["aas_core_fnc_serverReinforcements", 2]; }];
+        _armorMenu pushBack [["Tank", [_costReinf, AAS_Reinf_Armor_CostMult_Tank] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "ARMOR_TANK"] remoteExec ["aas_core_fnc_serverReinforcements", 2]; }];
         _reinfMenu pushBack ["ARMOR", _armorMenu];
     };
 
@@ -109,9 +109,9 @@ AAS_fnc_refreshBasicSupports = {
     private _airLastUse = missionNamespace getVariable ["AAS_Reinf_Air_LastUseTime", -99999];
     if (serverTime >= (_airLastUse + (parseNumber AAS_Cooldown_Reinf_Air))) then {
         private _airMenu = [];
-        _airMenu pushBack [["4-Man Squad (Heli)", [_costReinf, AAS_Reinf_Air_CostMult_4] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "AIR_4"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
-        _airMenu pushBack [["8-Man Squad (Heli)", [_costReinf, AAS_Reinf_Air_CostMult_8] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "AIR_8"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
-        _airMenu pushBack [["12-Man Squad (Paradrop)", [_costReinf, AAS_Reinf_Air_CostMult_12] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "AIR_12"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
+        _airMenu pushBack [["4-Man Squad (Heli)", [_costReinf, AAS_Reinf_Air_CostMult_4] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "AIR_4"] remoteExec ["aas_core_fnc_serverReinforcements", 2]; }];
+        _airMenu pushBack [["8-Man Squad (Heli)", [_costReinf, AAS_Reinf_Air_CostMult_8] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "AIR_8"] remoteExec ["aas_core_fnc_serverReinforcements", 2]; }];
+        _airMenu pushBack [["12-Man Squad (Paradrop)", [_costReinf, AAS_Reinf_Air_CostMult_12] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "AIR_12"] remoteExec ["aas_core_fnc_serverReinforcements", 2]; }];
         _reinfMenu pushBack ["INFANTRY: AIRBORNE", _airMenu];
     };
 
@@ -119,9 +119,9 @@ AAS_fnc_refreshBasicSupports = {
     private _mechLastUse = missionNamespace getVariable ["AAS_Reinf_Ground_LastUseTime", -99999];
     if (serverTime >= (_mechLastUse + (parseNumber AAS_Cooldown_Reinf_Ground))) then {
         private _mechMenu = [];
-        _mechMenu pushBack [["4-Man Squad (MRAP)", [_costReinf, AAS_Reinf_Ground_CostMult_4] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "MECH_4"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
-        _mechMenu pushBack [["8-Man Squad (APC)", [_costReinf, AAS_Reinf_Ground_CostMult_8] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "MECH_8"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
-        _mechMenu pushBack [["12-Man Squad (Truck)", [_costReinf, AAS_Reinf_Ground_CostMult_12] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "MECH_12"] remoteExec ["aas_fnc_serverReinforcements", 2]; }];
+        _mechMenu pushBack [["4-Man Squad (MRAP)", [_costReinf, AAS_Reinf_Ground_CostMult_4] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "MECH_4"] remoteExec ["aas_core_fnc_serverReinforcements", 2]; }];
+        _mechMenu pushBack [["8-Man Squad (APC)", [_costReinf, AAS_Reinf_Ground_CostMult_8] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "MECH_8"] remoteExec ["aas_core_fnc_serverReinforcements", 2]; }];
+        _mechMenu pushBack [["12-Man Squad (Truck)", [_costReinf, AAS_Reinf_Ground_CostMult_12] call _applyMultiplier] call _formatName, { [_this select 0, _this select 1, false, "MECH_12"] remoteExec ["aas_core_fnc_serverReinforcements", 2]; }];
         _reinfMenu pushBack ["INFANTRY: MECHANIZED", _mechMenu];
     };
     
@@ -144,7 +144,7 @@ AAS_fnc_refreshBasicSupports = {
 };
 
 // --- 3. PAGER UI FUNCTIONS ---
-AAS_fnc_updatePagerContent = {
+aas_core_fnc_updatePagerContent = {
     params [["_isMainMenu", true], ["_categoryData", []]];
     private _display = uiNamespace getVariable ["AAS_Pager_Display", displayNull];
     if (isNull _display) exitWith {};
@@ -152,7 +152,7 @@ AAS_fnc_updatePagerContent = {
     lbClear _ctrl;
 
     if (_isMainMenu) then {
-        call AAS_fnc_refreshBasicSupports;
+        call aas_core_fnc_refreshBasicSupports;
         AAS_Current_Submenu_Data = [];
         AAS_Menu_Stack = []; // Reset the navigation stack when viewing the main menu
         
@@ -185,7 +185,7 @@ AAS_fnc_updatePagerContent = {
     _ctrl lbSetCurSel 0;
 };
 
-AAS_fnc_handlePagerSelection = {
+aas_core_fnc_handlePagerSelection = {
     private _display = uiNamespace getVariable ["AAS_Pager_Display", displayNull];
     if (isNull _display) exitWith {};
     private _ctrl = _display displayCtrl 1500;
@@ -196,27 +196,27 @@ AAS_fnc_handlePagerSelection = {
     private _cmd = _ctrl lbData _idx;
     private _val = _ctrl lbValue _idx;
 
-    if (_cmd == "AAS_CMD_CLOSE") exitWith { [] call AAS_fnc_closePager; };
+    if (_cmd == "AAS_CMD_CLOSE") exitWith { [] call aas_core_fnc_closePager; };
     
     if (_cmd == "AAS_CMD_BACK") exitWith { 
         if (count AAS_Menu_Stack > 0) then {
             private _previousMenu = AAS_Menu_Stack deleteAt (count AAS_Menu_Stack - 1);
             AAS_Current_Submenu_Data = _previousMenu;
-            [false, AAS_Current_Submenu_Data] call AAS_fnc_updatePagerContent;
+            [false, AAS_Current_Submenu_Data] call aas_core_fnc_updatePagerContent;
         } else {
-            [true] call AAS_fnc_updatePagerContent; 
+            [true] call aas_core_fnc_updatePagerContent; 
         };
     };
 
     if (_cmd == "AAS_CMD_SUBMENU_MAIN") exitWith {
         AAS_Current_Submenu_Data = (AAS_Menu_Registry select _val) select 1;
-        [false, AAS_Current_Submenu_Data] call AAS_fnc_updatePagerContent;
+        [false, AAS_Current_Submenu_Data] call aas_core_fnc_updatePagerContent;
     };
 
     if (_cmd == "AAS_CMD_SUBMENU_NESTED") exitWith {
         AAS_Menu_Stack pushBack AAS_Current_Submenu_Data;
         AAS_Current_Submenu_Data = (AAS_Current_Submenu_Data select _val) select 1;
-        [false, AAS_Current_Submenu_Data] call AAS_fnc_updatePagerContent;
+        [false, AAS_Current_Submenu_Data] call aas_core_fnc_updatePagerContent;
     };
 
     if (_cmd == "AAS_CMD_EXECUTE") then {
@@ -224,14 +224,14 @@ AAS_fnc_handlePagerSelection = {
         if (!isNull AAS_Active_Smoke) then { _dropPos = getPos AAS_Active_Smoke; } else { _dropPos = getPos player; };
         private _code = (AAS_Current_Submenu_Data select _val) select 1;
         
-        [] call AAS_fnc_closePager;
+        [] call aas_core_fnc_closePager;
         
         [player, _dropPos] call _code;
     };
 };
 
 // --- SYNCHRONOUS CLEANUP ---
-AAS_fnc_closePager = {
+aas_core_fnc_closePager = {
     ("AAS_Pager_Layer" call BIS_fnc_rscLayer) cutText ["", "PLAIN"];
 
     private _mainDisplay = findDisplay 46;
@@ -249,13 +249,13 @@ AAS_fnc_closePager = {
     AAS_Active_Smoke = objNull;
 };
 
-AAS_fnc_openPager = {
+aas_core_fnc_openPager = {
     params [["_smoke", objNull]];
     if (!isNull (uiNamespace getVariable ["AAS_Pager_Display", displayNull])) exitWith {};
     
     AAS_Active_Smoke = _smoke;
     ("AAS_Pager_Layer" call BIS_fnc_rscLayer) cutRsc ["AAS_Pager_HUD", "PLAIN"];
-    [true] call AAS_fnc_updatePagerContent;
+    [true] call aas_core_fnc_updatePagerContent;
 
     inGameUISetEventHandler ["Action", "true"];
     inGameUISetEventHandler ["PrevAction", "true"];
@@ -267,7 +267,7 @@ AAS_fnc_openPager = {
     // --- DYNAMIC TEXTURE SWAP ---
     private _bgCtrl = _pagerDisplay displayCtrl 1200;
     if (!isNull _bgCtrl) then {
-        private _themeTextures = call AAS_fnc_getActiveThemeTextures;
+        private _themeTextures = call aas_core_fnc_getActiveThemeTextures;
         _bgCtrl ctrlSetText (_themeTextures select 0);
     };
 
@@ -316,7 +316,7 @@ AAS_fnc_openPager = {
         };
 
         if (!isNull _display) then { 
-            [] call AAS_fnc_closePager; 
+            [] call aas_core_fnc_closePager; 
         };
     };
 
@@ -351,7 +351,7 @@ AAS_fnc_openPager = {
         if (cameraView == "GUNNER") exitWith {false}; 
         if (_button == 2) then { 
             playSound "Click"; 
-            call AAS_fnc_handlePagerSelection; 
+            call aas_core_fnc_handlePagerSelection; 
         }; 
         false;
     }];
@@ -363,8 +363,8 @@ AAS_fnc_openPager = {
         private _ctrl = (uiNamespace getVariable ["AAS_Pager_Display", displayNull]) displayCtrl 1500;
         if (isNull _ctrl) exitWith {false};
 
-        if (_key == 14) exitWith { [] call AAS_fnc_closePager; true; }; // Backspace
-        if (_key == 57) exitWith { playSound "Click"; call AAS_fnc_handlePagerSelection; true; }; // Spacebar
+        if (_key == 14) exitWith { [] call aas_core_fnc_closePager; true; }; // Backspace
+        if (_key == 57) exitWith { playSound "Click"; call aas_core_fnc_handlePagerSelection; true; }; // Spacebar
 
         if (_key == 200) exitWith { // Arrow Up
             playSound "ReadoutClick";
@@ -411,7 +411,7 @@ AAS_fnc_openPager = {
                         private _selectedSignal = selectRandom _signalOptions;
                         playSound (_selectedSignal select 0);
                         systemChat (_selectedSignal select 1);
-                        [_smoke] call AAS_fnc_openPager;
+                        [_smoke] call aas_core_fnc_openPager;
                     };
                 };
             } forEach _nearSmokes;
@@ -428,7 +428,7 @@ AAS_fnc_openPager = {
     {
         if (isNull (uiNamespace getVariable ["AAS_Pager_Display", displayNull])) then {
             playSound "ReadoutClick"; 
-            [objNull] call AAS_fnc_openPager;
+            [objNull] call aas_core_fnc_openPager;
             systemChat "[AAS] TRANSMITTING GPS COORDINATES TO HQ...";
         };
     }, "" 

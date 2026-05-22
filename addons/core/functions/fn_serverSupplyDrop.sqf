@@ -56,7 +56,7 @@ if (!_isZeusOverride) then {
     };
     
     // Call the Central Economy Manager to do the math and check the preset
-    _econPass = [_caller, _cost, AAS_Econ_Preset_Core, AAS_Econ_Code_Supply] call AAS_fnc_setEconomyPreset;
+    _econPass = [_caller, _cost, AAS_Econ_Preset_Core, AAS_Econ_Code_Supply] call aas_core_fnc_setEconomyPreset;
 };
 
 // If the manager returns false (insufficient funds or failed custom code), abort!

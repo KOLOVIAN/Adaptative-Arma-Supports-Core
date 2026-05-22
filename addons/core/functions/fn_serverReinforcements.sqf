@@ -112,7 +112,7 @@ if (AAS_Econ_Preset_Core != 2) then {
     _finalCost = round (_baseCost * (parseNumber _costMultStr));
 };
 
-private _econPass = [_caller, _finalCost, AAS_Econ_Preset_Core, AAS_Econ_Code_Reinf] call AAS_fnc_setEconomyPreset;
+private _econPass = [_caller, _finalCost, AAS_Econ_Preset_Core, AAS_Econ_Code_Reinf] call aas_core_fnc_setEconomyPreset;
 if (!_econPass) exitWith {};
 
 // --- 3. FINALIZE SUPPORT ---
