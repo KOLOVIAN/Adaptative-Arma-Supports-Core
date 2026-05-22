@@ -1,9 +1,9 @@
 name = "AAS - Adaptative Arma Supports";
-picture = "aaslogo_ca.paa";      // Picture displayed in the Expansion menu
-logo = "aaslogo_ca.paa";         // Logo displayed on the main menu
-logoOver = "aaslogo_ca.paa"; // Logo displayed when the mouse hovers over it
+picture = "img\aaslogo_ca.paa";      // Picture displayed in the Expansion menu
+logo = "img\aaslogo_ca.paa";         // Logo displayed on the main menu
+logoOver = "img\aaslogo_ca.paa"; // Logo displayed when the mouse hovers over it
 tooltip = "AAS";
 tooltipOwned = "AAS - Adaptative Arma Supports";
 overview = "Adaptative Arma Supports provides a dynamic, non-blocking tactical pager for calling in CAS, Supply Drops, and Reinforcements tied to your mission's economy.";
 author = "KOLOVIAN";
-overviewPicture = "aaslogo_ca.paa"; // Picture displayed in the mod's overview tab
+overviewPicture = "img\aaslogo_ca.paa"; // Picture displayed in the mod's overview tab
