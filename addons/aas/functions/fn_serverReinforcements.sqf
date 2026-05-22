@@ -171,7 +171,7 @@ private _fnc_parseClass = {
     params ["_caller", "_dropPos", "_playerSide", "_isArmor", "_isAir", "_isMech", "_isPara", "_vehicleClassRaw", "_squadSize", "_behaviorMode", "_rtbTime", "_troopClasses", "_fnc_parseClass"];
 
     // Realistic 30 Seconds Delay for Ground forces
-    if (_isArmor || _isMech) then { sleep 30; };
+    if (_isArmor || _isMech) then { sleep 7; };
 
     private _spawnPos = [];
     private _spawnDir = 0;
