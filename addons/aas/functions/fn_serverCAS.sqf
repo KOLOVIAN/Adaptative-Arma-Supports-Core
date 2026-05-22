@@ -242,28 +242,6 @@ if (_isGunship) then {
         } forEach _phantoms;
     };
 
-    // --- WEAPON CYCLING THREAD ---
-    [_aircraft] spawn {
-        params ["_aircraft"];
-
-        private _turrets = allTurrets [_aircraft, false] select { !(_x isEqualTo [-1]) };
-
-        while {alive _aircraft} do {
-            sleep 20;
-
-            {
-                private _turretPath = _x;
-                private _turretWeapons = _aircraft weaponsTurret _turretPath;
-
-                if (count _turretWeapons > 1) then {
-                    private _currentWeapon = _aircraft currentWeaponTurret _turretPath;
-                    private _currentIdx = _turretWeapons find _currentWeapon;
-                    private _nextIdx = (_currentIdx + 1) mod (count _turretWeapons);
-                    _aircraft selectWeaponTurret [(_turretWeapons select _nextIdx), _turretPath];
-                };
-            } forEach _turrets;
-        };
-    };
 };
 
 switch (_behaviorMode) do {
