@@ -16,7 +16,7 @@ AAS_Loaded_Modules pushBackUnique "QRF";
 // =========================================================
 // --- 2. DYNAMIC CONTENT GENERATOR ---
 // =========================================================
-AQR_fnc_refreshQRF = {
+aas_qrf_fnc_refreshQRF = {
     // --- MASTER MENU TOGGLE CHECK ---
     if (!AQR_Enable_Menu) exitWith {
         private _idx = AAS_Menu_Registry findIf { (_x select 0) == "QUICK REACTION FORCE" };
@@ -65,7 +65,7 @@ AQR_fnc_refreshQRF = {
         // Push the action and the execution code into our local array
         _qrfOptions pushBack [
             _actionName, 
-            { [_this select 0, _this select 1] remoteExec ["aqr_fnc_serverQRF", 2]; }
+            { [_this select 0, _this select 1] remoteExec ["aas_qrf_fnc_serverQRF", 2]; }
         ];
     };
 
@@ -92,7 +92,7 @@ AQR_fnc_refreshQRF = {
     waitUntil { !isNull player && time > 0 && !isNil "AAS_Menu_Registry" && !isNil "AAS_Econ_Preset_Core" }; 
     
     while {true} do {
-        call AQR_fnc_refreshQRF;
+        call aas_qrf_fnc_refreshQRF;
         sleep 1.5; 
     };
 };
