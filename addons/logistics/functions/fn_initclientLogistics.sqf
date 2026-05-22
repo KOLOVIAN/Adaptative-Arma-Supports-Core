@@ -12,7 +12,7 @@ AAS_Loaded_Modules pushBackUnique "LOGISTICS";
 // =========================================================
 // --- TARGETING STATE MACHINE (TRANSPORT ONLY) ---
 // =========================================================
-AAS_LOG_fnc_startMapTargeting = {
+aas_logistics_fnc_startMapTargeting = {
     // FIX: Added _transportType parameter so the server knows which heli to spawn
     params ["_caller", ["_transportType", "Standard"]];
     
@@ -196,7 +196,7 @@ AAS_LOG_fnc_startMapTargeting = {
                 playSound "ReadoutClick";
                 
                 // FIX: Pass the Transport Type alongside the flight path
-                [_caller, _finalPath, _transportType] remoteExec ["aas_log_fnc_servertransport", 2];
+                [_caller, _finalPath, _transportType] remoteExec ["aas_logistics_fnc_servertransport", 2];
             } else {
                 systemChat "[AAS] Transport request cancelled.";
             };
@@ -207,7 +207,7 @@ AAS_LOG_fnc_startMapTargeting = {
 // =========================================================
 // --- DYNAMIC REGISTRY REFRESHER ---
 // =========================================================
-AAS_LOG_fnc_refreshLogistics = {
+aas_logistics_fnc_refreshLogistics = {
     private _logisticsMenu = [];
     
     private _econPreset = missionNamespace getVariable ["AAS_Econ_Preset_Core", 0];
@@ -251,7 +251,7 @@ AAS_LOG_fnc_refreshLogistics = {
         private _transName = ["Request EXFIL", "AAS_LOG_Transport_CostMult"] call _fnc_formatName;
         _logisticsMenu pushBack [
             _transName, 
-            compile " [player, 'Standard'] spawn AAS_LOG_fnc_startMapTargeting; "
+            compile " [player, 'Standard'] spawn aas_logistics_fnc_startMapTargeting; "
         ];
     };
 
@@ -263,7 +263,7 @@ AAS_LOG_fnc_refreshLogistics = {
         private _heavyTransName = ["Request EXFIL (HVY)", "AAS_LOG_TransportHeavy_CostMult"] call _fnc_formatName;
         _logisticsMenu pushBack [
             _heavyTransName, 
-            compile " [player, 'Heavy'] spawn AAS_LOG_fnc_startMapTargeting; "
+            compile " [player, 'Heavy'] spawn aas_logistics_fnc_startMapTargeting; "
         ];
     };
 
@@ -300,7 +300,7 @@ AAS_LOG_fnc_refreshLogistics = {
                         compile format ["
                             private _lzObj = missionNamespace getVariable ['AAS_Active_Smoke', objNull];
                             private _lz = if (isNull _lzObj) then { getPos player } else { getPos _lzObj };
-                            [player, _lz, '%1'] remoteExec ['aas_log_fnc_serverdelivery', 2];
+                            [player, _lz, '%1'] remoteExec ['aas_logistics_fnc_serverdelivery', 2];
                         ", _execId]
                     ];
                 };
@@ -332,7 +332,7 @@ AAS_LOG_fnc_refreshLogistics = {
 [] spawn {
     waitUntil { !isNull player && time > 0 && !isNil "AAS_Menu_Registry" && !isNil "AAS_Econ_Preset_Core" }; 
     while {true} do {
-        call AAS_LOG_fnc_refreshLogistics;
+        call aas_logistics_fnc_refreshLogistics;
         sleep 1.5; 
     };
 };

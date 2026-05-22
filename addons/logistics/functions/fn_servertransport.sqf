@@ -302,7 +302,7 @@ _wpLand setWaypointStatements ["true", "(vehicle this) land 'GET IN';"];
     private _selTO = selectRandom _takeoffLines;
     [_heli, _caller, _selTO select 1, 2, _selTO select 0] call _fnc_comms;
 
-    missionNamespace setVariable ["AAS_LOG_fnc_RedirectMap", {
+    missionNamespace setVariable ["aas_logistics_fnc_RedirectMap", {
         params ["_target", "_caller", "_actionId"];
         _target setVariable ["AAS_Dest_Changed", true, true]; 
         [_target, _caller] remoteExec ["removeAllActions", 0, _target]; 
@@ -373,7 +373,7 @@ _wpLand setWaypointStatements ["true", "(vehicle this) land 'GET IN';"];
         _heli,
         [
             "<t color='#FFA500'>Change Destination (Map)</t>", 
-            { _this call AAS_LOG_fnc_RedirectMap; }, 
+            { _this call aas_logistics_fnc_RedirectMap; }, 
             nil, 1.5, true, true, "", 
             "!(_target getVariable ['AAS_Dest_Changed', false]) && isPlayer _this && _this in _target && (_target distance2D (_target getVariable ['AAS_Current_Target_Dest', [0,0,0]]) > 400)"
         ]

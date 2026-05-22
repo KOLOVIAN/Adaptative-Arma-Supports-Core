@@ -1,7 +1,7 @@
 class AAS_LOG_Tablet_Dialog {
     idd = 8990; 
-    movingEnable = false;
-    enableSimulation = true;
+    movingEnable = 0;
+    enableSimulation = 1;
 
     class controls {
         // --- 1. THE TABLET FRAME ---
@@ -17,10 +17,10 @@ class AAS_LOG_Tablet_Dialog {
             lineSpacing = 0;
             fixedWidth = 0;
             shadow = 0;
-            x = safezoneX;
-            y = safezoneY;
-            w = safezoneW;
-            h = safezoneH;
+            x = "safezoneX";
+            y = "safezoneY";
+            w = "safezoneW";
+            h = "safezoneH";
         }; // <-- ADD THIS
 
         // --- 2. THE INTERACTIVE MAP ---
@@ -29,10 +29,10 @@ class AAS_LOG_Tablet_Dialog {
             type = 101;         
             style = 0;          
             
-            x = 0.258 * safezoneW + safezoneX;
-            y = 0.251 * safezoneH + safezoneY;
-            w = 0.48 * safezoneW;
-            h = 0.459 * safezoneH;
+            x = "0.258*safezoneW+safezoneX";
+            y = "0.251*safezoneH+safezoneY";
+            w = "0.48*safezoneW";
+            h = "0.459*safezoneH";
 
             // --- MANDATORY ENGINE PROPERTIES ---
             
