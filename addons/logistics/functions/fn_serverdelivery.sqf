@@ -250,8 +250,8 @@ _wpMove setWaypointSpeed "FULL";
     if (_isContainerized && alive _payloadObj) then {
         
         // --- 1. ACTION INJECTOR ENGINE ---
-        if (isNil "AAS_LOG_fnc_InitContainerActions") then {
-            missionNamespace setVariable ["AAS_LOG_fnc_InitContainerActions", {
+        if (isNil "aas_logistics_fnc_InitContainerActions") then {
+            missionNamespace setVariable ["aas_logistics_fnc_InitContainerActions", {
                 params ["_container", "_tClass", "_tLoadout", "_pSide", "_execId"];
                 _container setVariable ["AAS_Is_Moving", false, true];
 
@@ -297,7 +297,7 @@ _wpMove setWaypointSpeed "FULL";
                         _arguments params ["_tClassStr", "_tLoadStr", "_plSide", "_eId"];
                         
                         [_target] remoteExec ["removeAllActions", 0, _target];
-                        [_target, _tClassStr, _tLoadStr, _plSide, _eId] remoteExec ["AAS_LOG_fnc_UnpackContainer", 2];
+                        [_target, _tClassStr, _tLoadStr, _plSide, _eId] remoteExec ["aas_logistics_fnc_UnpackContainer", 2];
                     }, 
                     {}, 
                     [_tClass, _tLoadout, _pSide, _execId],
@@ -310,8 +310,8 @@ _wpMove setWaypointSpeed "FULL";
         };
 
         // --- 2. UNPACK ENGINE ---
-        if (isNil "AAS_LOG_fnc_UnpackContainer") then {
-            missionNamespace setVariable ["AAS_LOG_fnc_UnpackContainer", {
+        if (isNil "aas_logistics_fnc_UnpackContainer") then {
+            missionNamespace setVariable ["aas_logistics_fnc_UnpackContainer", {
                 params ["_container", "_targetClassStr", "_targetLoadout", "_playerSide", ["_execId", ""]];
                 if (!isServer) exitWith {};
                 
@@ -473,7 +473,7 @@ _wpMove setWaypointSpeed "FULL";
                             {}, 
                             {
                                 params ["_target", "_caller", "_actionId", "_arguments"];
-                                [_target] remoteExec ["AAS_LOG_fnc_RepackComposition", 2];
+                                [_target] remoteExec ["aas_logistics_fnc_RepackComposition", 2];
                             }, 
                             {}, 
                             [], 
@@ -532,8 +532,8 @@ _wpMove setWaypointSpeed "FULL";
             }, true];
         };
 
-        if (isNil "AAS_LOG_fnc_RepackComposition") then {
-            missionNamespace setVariable ["AAS_LOG_fnc_RepackComposition", {
+        if (isNil "aas_logistics_fnc_RepackComposition") then {
+            missionNamespace setVariable ["aas_logistics_fnc_RepackComposition", {
                 params ["_masterObj"];
                 if (!isServer) exitWith {};
 
@@ -557,12 +557,12 @@ _wpMove setWaypointSpeed "FULL";
                     _newContainer setMass 500;
                     _newContainer allowDamage false;
 
-                    [_newContainer, _tClassStr, _tLoadout, _pSide, _execId] call AAS_LOG_fnc_InitContainerActions;
+                    [_newContainer, _tClassStr, _tLoadout, _pSide, _execId] call aas_logistics_fnc_InitContainerActions;
                 };
             }, true];
         };
 
-        [_payloadObj, _targetClass, _targetLoadout, _playerSide, _execId] call AAS_LOG_fnc_InitContainerActions;
+        [_payloadObj, _targetClass, _targetLoadout, _playerSide, _execId] call aas_logistics_fnc_InitContainerActions;
 
     } else {
         if (alive _payloadObj) then {
