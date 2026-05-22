@@ -121,12 +121,32 @@ missionNamespace setVariable [_lastUseVar, serverTime, true];
 // Backwards compatibility sync for initCLIENT.sqf menu hider
 missionNamespace setVariable ["AAS_Reinf_LastUseTime", serverTime, true]; 
 
-if (_isArmor || _isMech) then {
-    "HQ: Ground units mobilizing. ETA 30 seconds." remoteExec ["systemChat", _caller];
+// ==========================================
+// --- RANDOMIZED VOICELINES INTEGRATION ---
+// ==========================================
+if (_isArmor) then {
+    private _armorComms = [
+        ["HQ: Copy that ground team. Armor on the way to your position, over.", "AAS_Voice_Armor1"],
+        ["HQ: Armor is half a click from your position. ETA 1 minute, over.", "AAS_Voice_Armor2"]
+    ];
+    private _selectedComm = selectRandom _armorComms;
+    
+    (_selectedComm select 0) remoteExec ["systemChat", _caller];
+    (_selectedComm select 1) remoteExec ["playSound", _caller];
 } else {
-    "HQ: Airborne units inbound. Secure the LZ." remoteExec ["systemChat", _caller];
+    // This fires for both Airborne (_isAir) and Mechanized Infantry (_isMech)
+    private _reinfComms = [
+        ["HQ: Reinforcements inbound. Secure the LZ.", "AAS_Voice_Reinf"],
+        ["HQ: Reinforcements are on their way. Hold your position, over.", "AAS_Voice_Reinf2"],
+        ["HQ: Reinforcements inbound. ETA 2 minutes.", "AAS_Voice_Reinf3"],
+        ["HQ: Copy that ground team, the squad is approaching your position.", "AAS_Voice_Reinf4"]
+    ];
+    private _selectedComm = selectRandom _reinfComms;
+    
+    (_selectedComm select 0) remoteExec ["systemChat", _caller];
+    (_selectedComm select 1) remoteExec ["playSound", _caller];
 };
-"AAS_Voice_Reinf" remoteExec ["playSound", _caller];
+
 
 // --- SMART PARSER HELPER FUNCTION ---
 private _fnc_parseClass = {
@@ -153,15 +173,48 @@ private _fnc_parseClass = {
     // Realistic 30 Seconds Delay for Ground forces
     if (_isArmor || _isMech) then { sleep 30; };
 
-    private _spawnDist = if (_isAir) then { 2500 } else { 500 };
-    private _spawnPos = _dropPos getPos [_spawnDist, random 360];
-    
-    // Find safe pos for ground vehicles to avoid spawning inside buildings or water
+    private _spawnPos = [];
+    private _spawnDir = 0;
+
+    // --- UPGRADED SPAWN & PATHING LOGIC ---
     if (_isArmor || _isMech) then {
-        private _safePos = [_spawnPos, 0, 300, 5, 0, 0.25, 0] call BIS_fnc_findSafePos;
-        if (count _safePos > 1) then { _spawnPos = _safePos; };
+        // Prioritize roads up to 500m away
+        private _roadsNear = _dropPos nearRoads 500;
+        
+        if (count _roadsNear > 0) then {
+            // Found a road - spawn exactly on it and face it down the path
+            private _road = _roadsNear select 0;
+            _spawnPos = getPos _road;
+            private _roadConnectedTo = roadsConnectedTo _road;
+            if (count _roadConnectedTo > 0) then {
+                _spawnDir = _road getDir (_roadConnectedTo select 0);
+            } else {
+                _spawnDir = _spawnPos getDir _dropPos;
+            };
+        } else {
+            // No roads within 500m - Spawn 350m away in the field, actively avoiding known enemies
+            private _enemies = (_dropPos nearEntities [["Man"], 500]) select { _playerSide getFriend (side _x) < 0.6 };
+            if (count _enemies > 0) then {
+                // Find a heading away from the closest enemy
+                private _closestEnemy = _enemies select 0;
+                private _enemyDir = _dropPos getDir _closestEnemy;
+                private _safeDir = _enemyDir + 180 + (random 60 - 30); // Opposite direction with a bit of randomness
+                _spawnPos = _dropPos getPos [350, _safeDir];
+            } else {
+                // No enemies, random 350m spawn
+                _spawnPos = _dropPos getPos [350, random 360];
+            };
+            
+            // Failsafe check so we don't spawn inside a rock
+            private _safePos = [_spawnPos, 0, 150, 5, 0, 0.25, 0] call BIS_fnc_findSafePos;
+            if (count _safePos > 1) then { _spawnPos = _safePos; };
+            _spawnDir = _spawnPos getDir _dropPos;
+        };
     } else {
+        // Airborne logic remains the same (high altitude)
+        _spawnPos = _dropPos getPos [2500, random 360];
         _spawnPos set [2, 150];
+        _spawnDir = _spawnPos getDir _dropPos;
     };
 
     // Parse Vehicle Class & Loadout safely
@@ -169,7 +222,7 @@ private _fnc_parseClass = {
     private _vehClass = _vehParsed select 0;
     private _vehLoadout = _vehParsed select 1;
 
-    private _vehData = [_spawnPos, _spawnPos getDir _dropPos, _vehClass, _playerSide] call BIS_fnc_spawnVehicle;
+    private _vehData = [_spawnPos, _spawnDir, _vehClass, _playerSide] call BIS_fnc_spawnVehicle;
     private _vehicle = _vehData select 0;
     private _vehGroup = _vehData select 2;
 
@@ -204,6 +257,7 @@ private _fnc_parseClass = {
         
         private _wpLand = _vehGroup addWaypoint [_dropPos, 0];
         _wpLand setWaypointType "MOVE";
+        _wpLand setWaypointSpeed "FULL";
         _wpLand setWaypointCompletionRadius 50;
 
         // Wait until arrived or destroyed
@@ -337,10 +391,11 @@ private _fnc_parseClass = {
         } else {
             private _wpLand = _vehGroup addWaypoint [_dropPos, 0];
             _wpLand setWaypointType "MOVE";
+            _wpLand setWaypointSpeed "FULL";
             if (_isAir) then {
                 _wpLand setWaypointStatements ["true", "(vehicle this) land 'LAND';"];
             } else {
-                _wpLand setWaypointCompletionRadius 20;
+                _wpLand setWaypointCompletionRadius 50; // Ensure completion radius aligns with the 50m wait check
             };
         };
 
@@ -389,7 +444,16 @@ private _fnc_parseClass = {
                     waitUntil { sleep 0.1; (getPosVisual _vehicle select 2) < 1.5 || !alive _vehicle };
                     if (alive _vehicle) then { _vehicle engineOn false; sleep 1; };
                 } else {
-                    waitUntil { sleep 1; (_vehicle distance2D _dropPos) < 50 || !alive _vehicle || speed _vehicle == 0 };
+                    // GROUND TRANSPORT HALT LOGIC:
+                    // Wait strictly until it hits the 55m radius (5m buffer) or is immobilized.
+                    // Removed 'speed == 0' so it doesn't dismount randomly when dodging a tree.
+                    waitUntil { sleep 1; (_vehicle distance2D _dropPos) <= 55 || !alive _vehicle || !canMove _vehicle };
+                    
+                    if (alive _vehicle) then {
+                        // Force the AI driver to hit the brakes immediately
+                        while {(count (waypoints _vehGroup)) > 0} do { deleteWaypoint ((waypoints _vehGroup) select 0); };
+                        doStop _vehicle; 
+                    };
                 };
 
                 if (alive _vehicle) then {
@@ -432,23 +496,36 @@ private _fnc_parseClass = {
                 };
             };
 
-            // 3. Transport Extraction (Spawned separately so it doesn't block troop timers)
+            // 3. Transport Extraction & Lingering
             [_vehicle, _vehGroup, _isAir, _isPara, _spawnPos] spawn {
                 params ["_vehicle", "_vehGroup", "_isAir", "_isPara", "_spawnPos"];
+                
                 if (alive _vehicle) then {
-                    if (_isAir && !_isPara) then { _vehicle engineOn true; };
+                    if (_isAir && !_isPara) then { 
+                        _vehicle engineOn true; 
+                    };
                     
-                    // Ground vehicles wait 90 seconds before leaving to provide covering fire
-                    if (!_isAir) then { sleep 90; };
+                    if (!_isAir) then {
+                        // Activate 2-minute Overwatch mode for Ground Vehicles (Uses turrets to cover troops)
+                        _vehGroup setCombatMode "RED";
+                        _vehGroup setBehaviour "COMBAT";
+                        sleep 120;
+                    };
 
                     if (alive _vehicle) then {
+                        // Clear any combat waypoints and force RTB
                         while {(count (waypoints _vehGroup)) > 0} do { deleteWaypoint ((waypoints _vehGroup) select 0); };
+                        
                         private _wpAway = _vehGroup addWaypoint [_spawnPos, 0];
                         _wpAway setWaypointType "MOVE";
                         _wpAway setWaypointSpeed "FULL";
                         
-                        // Vehicle mortality restored for Ground transports leaving the AO
                         if (!_isAir) then {
+                            // Turn off combat mode so it ignores enemies and drives away
+                            _vehGroup setBehaviour "CARELESS";
+                            _vehGroup setCombatMode "BLUE";
+                            
+                            // Restore vehicle mortality as it leaves the AO
                             _vehicle allowDamage true;
                             { _x allowDamage true; } forEach crew _vehicle;
                         };

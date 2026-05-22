@@ -103,7 +103,14 @@ class CfgRemoteExec {
 // --- SOUNDS ---
 // =======================================================
 class CfgSounds {
-    sounds[] = {};
+    // We now officially register every single sound class here
+    sounds[] = {
+        "AAS_Voice_Signal1", "AAS_Voice_Signal2", "AAS_Voice_Signal3", 
+        "AAS_Voice_Supply", "AAS_Voice_CAS", "AAS_Voice_Reinf",
+        "AAS_Voice_Armor1", "AAS_Voice_Armor2", "AAS_Voice_CAS2", 
+        "AAS_Voice_CAS3", "AAS_Voice_Reinf2", "AAS_Voice_Reinf3", "AAS_Voice_Reinf4"
+    };
+
     class AAS_Voice_Signal1 {
         name = "AAS_Voice_Signal1";
         sound[] = {"\z\aas\addons\aas\sounds\hq_signal1.ogg", 1, 1}; 
@@ -132,6 +139,43 @@ class CfgSounds {
     class AAS_Voice_Reinf {
         name = "AAS_Voice_Reinf";
         sound[] = {"\z\aas\addons\aas\sounds\hq_reinf.ogg", 1, 1};
+        titles[] = {};
+    };
+
+    // --- NEWLY ADDED SOUNDS ---
+    class AAS_Voice_Armor1 {
+        name = "AAS_Voice_Armor1";
+        sound[] = {"\z\aas\addons\aas\sounds\hq_armor1.ogg", 1, 1};
+        titles[] = {};
+    };
+    class AAS_Voice_Armor2 {
+        name = "AAS_Voice_Armor2";
+        sound[] = {"\z\aas\addons\aas\sounds\hq_armor2.ogg", 1, 1};
+        titles[] = {};
+    };
+    class AAS_Voice_CAS2 {
+        name = "AAS_Voice_CAS2";
+        sound[] = {"\z\aas\addons\aas\sounds\hq_cas2.ogg", 1, 1};
+        titles[] = {};
+    };
+    class AAS_Voice_CAS3 {
+        name = "AAS_Voice_CAS3";
+        sound[] = {"\z\aas\addons\aas\sounds\hq_cas3.ogg", 1, 1};
+        titles[] = {};
+    };
+    class AAS_Voice_Reinf2 {
+        name = "AAS_Voice_Reinf2";
+        sound[] = {"\z\aas\addons\aas\sounds\hq_reinf2.ogg", 1, 1};
+        titles[] = {};
+    };
+    class AAS_Voice_Reinf3 {
+        name = "AAS_Voice_Reinf3";
+        sound[] = {"\z\aas\addons\aas\sounds\hq_reinf3.ogg", 1, 1};
+        titles[] = {};
+    };
+    class AAS_Voice_Reinf4 {
+        name = "AAS_Voice_Reinf4";
+        sound[] = {"\z\aas\addons\aas\sounds\hq_reinf4.ogg", 1, 1};
         titles[] = {};
     };
 };

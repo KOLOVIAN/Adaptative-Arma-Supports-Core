@@ -84,8 +84,19 @@ if (!_econPass) exitWith {};
 // --- 3. FINALIZE SUPPORT ---
 missionNamespace setVariable ["AAS_CAS_LastUseTime", serverTime, true];
 
-"HQ: Close Air Support near your position. Keep your heads down." remoteExec ["systemChat", _caller];
-"AAS_Voice_CAS" remoteExec ["playSound", _caller]; 
+// ==========================================
+// --- RANDOMIZED VOICELINES INTEGRATION ---
+// ==========================================
+private _casComms = [
+    ["HQ: Close Air Support near your position. Keep your heads down.", "AAS_Voice_CAS"],
+    ["HQ: Close Air Support authorized. Aircraft is inbound, over.", "AAS_Voice_CAS2"],
+    ["HQ: Roger that, aircraft dispatched. ETA 1 minute.", "AAS_Voice_CAS3"]
+];
+private _selectedComm = selectRandom _casComms;
+
+(_selectedComm select 0) remoteExec ["systemChat", _caller];
+(_selectedComm select 1) remoteExec ["playSound", _caller];
+
 
 // =========================================================================
 // --- 4. SPAWN AIRCRAFT & APPLY CUSTOM LOADOUTS ---
@@ -241,7 +252,6 @@ if (_isGunship) then {
             };
         } forEach _phantoms;
     };
-
 };
 
 switch (_behaviorMode) do {
