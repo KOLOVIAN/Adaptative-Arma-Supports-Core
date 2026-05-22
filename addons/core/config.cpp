@@ -56,7 +56,7 @@ class Display3DEN {
 class CfgFunctions {
     class aas { 
         class supportScripts {
-            file = "\z\aas\addons\aas\functions"; 
+            file = "\z\aas\addon\core\functions"; 
             class initSettings {}; // <-- FIXED: Removed { preInit = 1; }
             class initClient { postInit = 1; }; 
             class initServer { postInit = 1; };
@@ -113,69 +113,69 @@ class CfgSounds {
 
     class AAS_Voice_Signal1 {
         name = "AAS_Voice_Signal1";
-        sound[] = {"\z\aas\addons\aas\sounds\hq_signal1.ogg", 1, 1}; 
+        sound[] = {"\z\aas\addon\core\sounds\hq_signal1.ogg", 1, 1}; 
         titles[] = {};
     };
     class AAS_Voice_Signal2 {
         name = "AAS_Voice_Signal2";
-        sound[] = {"\z\aas\addons\aas\sounds\hq_signal2.ogg", 1, 1};
+        sound[] = {"\z\aas\addon\core\sounds\hq_signal2.ogg", 1, 1};
         titles[] = {};
     };
     class AAS_Voice_Signal3 {
         name = "AAS_Voice_Signal3";
-        sound[] = {"\z\aas\addons\aas\sounds\hq_signal3.ogg", 1, 1};
+        sound[] = {"\z\aas\addon\core\sounds\hq_signal3.ogg", 1, 1};
         titles[] = {};
     };
     class AAS_Voice_Supply {
         name = "AAS_Voice_Supply";
-        sound[] = {"\z\aas\addons\aas\sounds\hq_supply.ogg", 1, 1};
+        sound[] = {"\z\aas\addon\core\sounds\hq_supply.ogg", 1, 1};
         titles[] = {};
     };
     class AAS_Voice_CAS {
         name = "AAS_Voice_CAS";
-        sound[] = {"\z\aas\addons\aas\sounds\hq_cas.ogg", 1, 1};
+        sound[] = {"\z\aas\addon\core\sounds\hq_cas.ogg", 1, 1};
         titles[] = {};
     };
     class AAS_Voice_Reinf {
         name = "AAS_Voice_Reinf";
-        sound[] = {"\z\aas\addons\aas\sounds\hq_reinf.ogg", 1, 1};
+        sound[] = {"\z\aas\addon\core\sounds\hq_reinf.ogg", 1, 1};
         titles[] = {};
     };
 
     // --- NEWLY ADDED SOUNDS ---
     class AAS_Voice_Armor1 {
         name = "AAS_Voice_Armor1";
-        sound[] = {"\z\aas\addons\aas\sounds\hq_armor1.ogg", 1, 1};
+        sound[] = {"\z\aas\addon\core\sounds\hq_armor1.ogg", 1, 1};
         titles[] = {};
     };
     class AAS_Voice_Armor2 {
         name = "AAS_Voice_Armor2";
-        sound[] = {"\z\aas\addons\aas\sounds\hq_armor2.ogg", 1, 1};
+        sound[] = {"\z\aas\addon\core\sounds\hq_armor2.ogg", 1, 1};
         titles[] = {};
     };
     class AAS_Voice_CAS2 {
         name = "AAS_Voice_CAS2";
-        sound[] = {"\z\aas\addons\aas\sounds\hq_cas2.ogg", 1, 1};
+        sound[] = {"\z\aas\addon\core\sounds\hq_cas2.ogg", 1, 1};
         titles[] = {};
     };
     class AAS_Voice_CAS3 {
         name = "AAS_Voice_CAS3";
-        sound[] = {"\z\aas\addons\aas\sounds\hq_cas3.ogg", 1, 1};
+        sound[] = {"\z\aas\addon\core\sounds\hq_cas3.ogg", 1, 1};
         titles[] = {};
     };
     class AAS_Voice_Reinf2 {
         name = "AAS_Voice_Reinf2";
-        sound[] = {"\z\aas\addons\aas\sounds\hq_reinf2.ogg", 1, 1};
+        sound[] = {"\z\aas\addon\core\sounds\hq_reinf2.ogg", 1, 1};
         titles[] = {};
     };
     class AAS_Voice_Reinf3 {
         name = "AAS_Voice_Reinf3";
-        sound[] = {"\z\aas\addons\aas\sounds\hq_reinf3.ogg", 1, 1};
+        sound[] = {"\z\aas\addon\core\sounds\hq_reinf3.ogg", 1, 1};
         titles[] = {};
     };
     class AAS_Voice_Reinf4 {
         name = "AAS_Voice_Reinf4";
-        sound[] = {"\z\aas\addons\aas\sounds\hq_reinf4.ogg", 1, 1};
+        sound[] = {"\z\aas\addon\core\sounds\hq_reinf4.ogg", 1, 1};
         titles[] = {};
     };
 };
@@ -185,6 +185,6 @@ class CfgSounds {
 // =======================================================
 class Extended_PreInit_EventHandlers {
     class AAS_Main_PreInit {
-        init = "call compile preprocessFileLineNumbers '\z\aas\addons\aas\functions\fn_initSettings.sqf'";
+        init = "call compile preprocessFileLineNumbers '\z\aas\addon\core\functions\fn_initSettings.sqf'";
     };
 };
