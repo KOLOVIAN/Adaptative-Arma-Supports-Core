@@ -42,6 +42,8 @@ class CfgPatches {
 	};
 };
 
+#include "CfgFunctions.hpp"
+
 // =======================================================
 // --- BASE UI DEFINITIONS (REQUIRED FOR THE MOD) ---
 // =======================================================
@@ -69,29 +71,10 @@ class Display3DEN {
             // 2. Define the actual button alongside the Log folder
             class AAS_Export_CBA {
                 text = "AAS - Export for CBA Settings";
-                action = "[] spawn aas_fnc_edenExport;";
+                action = "[] spawn aas_core_fnc_edenExport;";
                 conditionShow = "HoverObject"; // Triggers when hovering over the vehicle/unit
                 picture = "\a3\3DEN\Data\Controls\ctrlMenu\link_ca.paa"; 
             };
-        };
-    };
-};
-
-// =======================================================
-// --- FUNCTIONS ---
-// =======================================================
-class CfgFunctions {
-    class aas { 
-        class supportScripts {
-            file = "\z\aas\addon\core\functions"; 
-            class initSettings {}; // <-- FIXED: Removed { preInit = 1; }
-            class initClient { postInit = 1; }; 
-            class initServer { postInit = 1; };
-            class serverCAS {};
-            class serverReinforcements {};
-            class serverSupplyDrop {};
-            class setEconomyPreset {}; 
-            class edenExport {}; // Registered the exporter
         };
     };
 };
@@ -115,9 +98,9 @@ class CfgRemoteExec {
     class Functions {
         mode = 2;
         jip = 0;
-        class aas_fnc_serverCAS { allowedTargets = 2; }; 
-        class aas_fnc_serverReinforcements { allowedTargets = 2; }; 
-        class aas_fnc_serverSupplyDrop { allowedTargets = 2; }; 
+        class aas_core_fnc_serverCAS { allowedTargets = 2; }; 
+        class aas_core_fnc_serverReinforcements { allowedTargets = 2; }; 
+        class aas_core_fnc_serverSupplyDrop { allowedTargets = 2; }; 
     };
     class Commands {
         mode = 2;

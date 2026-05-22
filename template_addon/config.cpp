@@ -7,7 +7,7 @@ class CfgPatches {
 		name = ADDON_NAME;
 
         author = "$STR_aas_author";
-        authors[] = {"Nomas / Redwan S. [AET]", "OverlordZorn [CVO]"};
+        authors[] = {"KOLOVIAN", "Nomas / Redwan S. [AET]", "OverlordZorn [CVO]"};
         
         url = "$STR_aas_URL";
 

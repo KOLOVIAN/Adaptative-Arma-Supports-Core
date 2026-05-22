@@ -1,7 +1,7 @@
-#define COMPONENT core
+#define COMPONENT airstrikes
 
 // This is being used for the Addon's Name and can be "My Addon Template Framework"
-#define COMPONENT_BEAUTIFIED AAS - Core
+#define COMPONENT_BEAUTIFIED AAS - Airstrikes
 
 
 #include "\z\aas\addons\main\script_mod.hpp"

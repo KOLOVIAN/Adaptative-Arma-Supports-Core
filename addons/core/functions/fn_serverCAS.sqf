@@ -78,7 +78,7 @@ if (AAS_Econ_Preset_Core != 2) then {
 };
 
 // Call the Central Economy Manager
-private _econPass = [_caller, _finalCost, AAS_Econ_Preset_Core, AAS_Econ_Code_CAS] call AAS_fnc_setEconomyPreset;
+private _econPass = [_caller, _finalCost, AAS_Econ_Preset_Core, AAS_Econ_Code_CAS] call aas_core_fnc_setEconomyPreset;
 if (!_econPass) exitWith {};
 
 // --- 3. FINALIZE SUPPORT ---
