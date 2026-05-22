@@ -14,7 +14,7 @@ AAS_Loaded_Modules pushBackUnique "ARTILLERY";
 // =========================================================
 // --- TARGETING STATE MACHINE & LOGIC ---
 // =========================================================
-AAS_ART_fnc_startTargeting = {
+aas_artillery_fnc_startTargeting = {
     params ["_caller", "_strikeType"];
     
     [_caller, _strikeType] spawn {
@@ -171,7 +171,7 @@ AAS_ART_fnc_startTargeting = {
             };
         };
 
-        uiNamespace setVariable ["AAS_ART_fnc_refreshTargetingUI", _refreshTargetingUI];
+        uiNamespace setVariable ["aas_artillery_fnc_refreshTargetingUI", _refreshTargetingUI];
 
         sleep 0.15; 
         ["LASER"] call _refreshTargetingUI;
@@ -424,14 +424,14 @@ AAS_ART_fnc_startTargeting = {
                                     player setVariable ["AAS_MapClick_Pos", []];
                                     player setVariable ["AAS_MapClick_Time", 0];
                                     playSound "ReadoutClick";
-                                    ["MAP_IDLE"] call (uiNamespace getVariable "AAS_ART_fnc_refreshTargetingUI");
+                                    ["MAP_IDLE"] call (uiNamespace getVariable "aas_artillery_fnc_refreshTargetingUI");
                                 } else {
                                     private _worldPos = _control ctrlMapScreenToWorld [_xPos, _yPos];
                                     player setVariable ["AAS_MapClick_Pos", [_worldPos select 0, _worldPos select 1, 0]];
                                     player setVariable ["AAS_MapClick_Time", time + 5.5]; 
                                     playSound "FD_Timer_F"; 
                                     
-                                    ["MAP_LOCKING"] call (uiNamespace getVariable "AAS_ART_fnc_refreshTargetingUI");
+                                    ["MAP_LOCKING"] call (uiNamespace getVariable "aas_artillery_fnc_refreshTargetingUI");
                                 };
                             };
                         }];
@@ -476,7 +476,7 @@ AAS_ART_fnc_startTargeting = {
         // --- CLEANUP & EXECUTION ---
         // ==========================================
         
-        uiNamespace setVariable ["AAS_ART_fnc_refreshTargetingUI", nil];
+        uiNamespace setVariable ["aas_artillery_fnc_refreshTargetingUI", nil];
         
         _caller setVariable ["AAS_TargetMode", "FINISHED"]; 
         
@@ -507,7 +507,7 @@ AAS_ART_fnc_startTargeting = {
                 playSound "aas_art_targetlocked";
             };
 
-            [_caller, _targetPos, _strikeType] remoteExec ["aas_art_fnc_serverArtillery", 2];
+            [_caller, _targetPos, _strikeType] remoteExec ["aas_artillery_fnc_serverArtillery", 2];
         } else { 
             ["", -1, -1, 0, 0, 0, 8999] spawn BIS_fnc_dynamicText; 
             systemChat "HQ: Targeting window expired."; 
@@ -519,7 +519,7 @@ AAS_ART_fnc_startTargeting = {
 // =========================================================
 // --- DYNAMIC REGISTRY REFRESHER (REROUTED TO CORE) ---
 // =========================================================
-AAS_ART_fnc_refreshArtillery = {
+aas_artillery_fnc_refreshArtillery = {
     private _artilleryMenu = [];
     
     // REROUTED: Fetch the Global Economy Preset instead of the local one
@@ -569,7 +569,7 @@ AAS_ART_fnc_refreshArtillery = {
                 // Push the strike into the subfolder
                 _categorySubMenu pushBack [
                     _actionName, 
-                    compile format [" [player, '%1'] spawn AAS_ART_fnc_startTargeting; ", _id]
+                    compile format [" [player, '%1'] spawn aas_artillery_fnc_startTargeting; ", _id]
                 ];
             };
         } forEach _munitionsArray;
@@ -636,7 +636,7 @@ AAS_ART_fnc_refreshArtillery = {
     // FAILSAFE FIX: Ensure Core Mod variables actually exist before attempting to inject
     waitUntil { !isNull player && time > 0 && !isNil "AAS_Menu_Registry" && !isNil "AAS_Econ_Preset_Core" }; 
     while {true} do {
-        call AAS_ART_fnc_refreshArtillery;
+        call aas_artillery_fnc_refreshArtillery;
         sleep 1.5; 
     };
 };
