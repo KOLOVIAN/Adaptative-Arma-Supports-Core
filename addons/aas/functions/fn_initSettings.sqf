@@ -49,7 +49,7 @@ private _themeNames = [];
 // ==========================================
 
 // --- 1. Classnames & Parameters ---
-[ "AAS_Heli_Supply", "EDITBOX", ["Supply Helicopter", "Classname for the unarmed supply drop helicopter."], ["AAS - Supply Drop", "1. Classnames & Parameters"], "O_Heli_Light_02_unarmed_F", 1 ] call CBA_fnc_addSetting;
+[ "AAS_Heli_Supply", "EDITBOX", ["Supply Helicopter", "Classname for the unarmed supply drop helicopter."], ["AAS - Supply Drop", "1. Classnames & Parameters"], "B_Heli_Light_01_F", 1 ] call CBA_fnc_addSetting;
 [ "AAS_Cooldown_Supply", "EDITBOX", ["Supply Cooldown (Seconds)", "Enter the cooldown time in seconds."], ["AAS - Supply Drop", "1. Classnames & Parameters"], "600", 1 ] call CBA_fnc_addSetting;
 
 // --- 2. Economy Costs ---
@@ -70,7 +70,7 @@ private _themeNames = [];
 
 // --- 0. Global Settings & Base Costs ---
 [ "AAS_Cooldown_CAS", "EDITBOX", ["Global CAS Cooldown (Seconds)", "Global cooldown time for all CAS supports."], ["AAS - Close Air Support", "0. Global Settings & Base Costs"], "900", 1 ] call CBA_fnc_addSetting;
-[ "AAS_RTB_CAS", "EDITBOX", ["Global CAS RTB Time (Seconds)", "Global time before the CAS leaves the AO."], ["AAS - Close Air Support", "0. Global Settings & Base Costs"], "120", 1 ] call CBA_fnc_addSetting;
+[ "AAS_RTB_CAS", "EDITBOX", ["Global CAS RTB Time (Seconds)", "Global time before the CAS leaves the AO."], ["AAS - Close Air Support", "0. Global Settings & Base Costs"], "270", 1 ] call CBA_fnc_addSetting;
 [ "AAS_Cost_CAS_Custom", "EDITBOX", ["Base Cost: Custom / Free", "Used when 'Custom / Free' is selected."], ["AAS - Close Air Support", "0. Global Settings & Base Costs"], "0", 1 ] call CBA_fnc_addSetting;
 [ "AAS_Cost_CAS_Antistasi", "EDITBOX", ["Base Cost: Antistasi", "Used for both Faction and Personal presets."], ["AAS - Close Air Support", "0. Global Settings & Base Costs"], "1000", 1 ] call CBA_fnc_addSetting;
 [ "AAS_Cost_CAS_Overthrow", "EDITBOX", ["Base Cost: Overthrow", "Default Wallet funds."], ["AAS - Close Air Support", "0. Global Settings & Base Costs"], "6000", 1 ] call CBA_fnc_addSetting;
