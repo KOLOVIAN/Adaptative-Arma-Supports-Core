@@ -110,19 +110,19 @@ private _fnc_parseClass = {
 // --- 4. PARSE SETTINGS & SPAWN LOGIC ---
 // ==========================================
 private _isContainerized = false;
-private _forceRope = false; // <-- NEW TOGGLE
 private _rawHeliClass = "";
 private _targetClass = "";
 private _targetLoadout = false;
 
+// --- DYNAMIC TOGGLE READ ---
+private _forceRope = missionNamespace getVariable [format ["AAS_LOG_%1_ForceRope", _execId], false];
+
 if (_isComposition) then {
     _isContainerized = true;
-    _forceRope = missionNamespace getVariable ["AAS_LOG_Comp_ForceRope", false];
     _rawHeliClass = missionNamespace getVariable ["AAS_LOG_Comp_Heli", "B_Heli_Transport_03_F"];
     _targetClass = missionNamespace getVariable [_varClass, ""]; 
 } else {
     _isContainerized = missionNamespace getVariable [format ["AAS_LOG_%1_Container", _execId], false];
-    _forceRope = missionNamespace getVariable [format ["AAS_LOG_%1_ForceRope", _execId], false];
     _rawHeliClass = missionNamespace getVariable [format ["AAS_LOG_%1_Heli", _execId], "B_Heli_Transport_03_F"];
     
     private _rawPayloadClass = missionNamespace getVariable [_varClass, ""];
