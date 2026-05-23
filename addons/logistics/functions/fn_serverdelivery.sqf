@@ -238,32 +238,81 @@ _wpMove setWaypointSpeed "FULL";
 
     // --- THE SWITCH (Drop Cargo Logic) ---
     private _despawnPos = _lzPos getPos [3000, random 360];
-
     if (_forceRope) then {
-        // HOVER & SLICE MANEUVER (For Custom Ropes)
-        waitUntil { sleep 0.25; (_heli distance2D _lzPos < 50) || !alive _heli };
+        
+        // 1. APPROACH PHASE: AI waypoints bring it close
+        waitUntil { sleep 0.5; (_heli distance2D _lzPos < 150) || !alive _heli };
         
         if (alive _heli) then {
-            // Delete approach waypoints and force the AI to hover
             while {(count (waypoints _heliGroup)) > 0} do { deleteWaypoint ((waypoints _heliGroup) select 0); };
-            doStop _heli;
-            _heli flyInHeight 25;
             
-            // Wait for the heli to bleed speed and stabilize (or fallback after 15 seconds)
-            private _timeout = serverTime + 15;
-            waitUntil { sleep 0.5; (speed _heli < 20 && (getPos _heli select 2) < 40) || serverTime > _timeout || !alive _heli };
+            // 2. GUIDED GLIDE: Smooth velocity control replaces doMove
+            // Speed is proportional to distance — fast when far, crawling when close
+            _heli flyInHeight 32;
+            _heli forceSpeed 1000; // Remove AI speed cap so it doesn't fight our velocity
             
-            // Forcefully slice the custom ropes
-            {ropeDestroy _x} forEach ropes _heli;
+            private _glideTimeout = serverTime + 60;
+            while { alive _heli && (_heli distance2D _lzPos > 5) && serverTime < _glideTimeout } do {
+                private _dist = _heli distance2D _lzPos;
+                private _dir = _heli getDir _lzPos;
+                
+                // Smooth speed curve: 10 m/s at 150m, ~2 m/s at 10m, floor of 1.5 m/s
+                private _speed = ((_dist / 5) min 8) max 3.5;
+                
+                private _vx = (sin _dir) * _speed;
+                private _vy = (cos _dir) * _speed;
+                
+                // Altitude correction — gently steer toward 45m AGL above the LZ
+                private _targetAlt = (getTerrainHeightASL _lzPos) + 32;
+                private _currentAlt = (getPosASL _heli) select 2;
+                private _vz = ((_targetAlt - _currentAlt) * 0.3) max -2 min 2;
+                
+                _heli setVelocity [_vx, _vy, _vz];
+                sleep 0.1;
+            };
             
-            // Remove speed limit so it can escape quickly
-            _heli limitSpeed 1000;
-            
-            _heli commandMove _despawnPos;
-            private _wpLeave = _heliGroup addWaypoint [_despawnPos, 0];
-            _wpLeave setWaypointType "MOVE";
-            _wpLeave setWaypointSpeed "FULL";
+            if (alive _heli) then {
+                // 3. DECELERATION: Ease to a stop over 2 seconds instead of instant freeze
+                private _vel = velocity _heli;
+                for "_i" from 1 to 20 do {
+                    private _factor = 1 - (_i / 20);
+                    _heli setVelocity [
+                        (_vel select 0) * _factor,
+                        (_vel select 1) * _factor,
+                        ((_vel select 2) * _factor) max -0.3
+                    ];
+                    sleep 0.1;
+                };
+                
+                // 4. HOVER LOCK: Now the AI takes over for a clean stationary hover
+                _heli setVelocity [0, 0, 0];
+                doStop _heli;
+                _heli forceSpeed 0;
+                
+                // Let the payload pendulum settle
+                sleep 4;
+                
+                // 5. THE WINCH: Unspool ropes
+                { ropeUnwind [_x, 5, 150] } forEach ropes _heli;
+                
+                // Wait until payload touches ground
+                private _dropTimeout = serverTime + 40;
+                waitUntil { sleep 0.25; isTouchingGround _payloadObj || ((getPos _payloadObj) select 2 < 1) || serverTime > _dropTimeout || !alive _heli };
+                
+                // 6. Slice the custom ropes
+                { ropeDestroy _x } forEach ropes _heli;
+                
+                // 7. EVACUATION: Reset and move away
+                _heli forceSpeed 1000;
+                _heli flyInHeight 150;
+                _heli doMove _despawnPos;
+                
+                private _wpLeave = _heliGroup addWaypoint [_despawnPos, 0];
+                _wpLeave setWaypointType "MOVE";
+                _wpLeave setWaypointSpeed "FULL";
+            };
         };
+        
     } else {
         // VANILLA DROP MANEUVER (UNHOOK)
         waitUntil { sleep 0.25; (_heli distance2D _lzPos < 120) || !alive _heli };
