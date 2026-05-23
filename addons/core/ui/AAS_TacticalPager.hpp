@@ -15,7 +15,7 @@ class AAS_Pager_HUD {
             colorText[] = {1, 1, 1, 1}; 
             shadow = 0; // Disable engine-generated drop shadows
             
-            text = "\z\aas\addon\core\data\tacticalpager_modern.paa"; 
+            text = "\z\aas\addons\core\data\tacticalpager_modern.paa"; 
             
             w = "0.316*safezoneW";
             h = "0.885*safezoneH";
