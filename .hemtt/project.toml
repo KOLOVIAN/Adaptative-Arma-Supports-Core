@@ -8,7 +8,7 @@ author = "KOLOVIAN"
 url = "https://github.com/KOLOVIAN/Adaptative-Arma-Supports-Core"
 
 [binarize]
-enabled = true # Default: true
+enabled = false # Default: true
 
 [files]
 include = [
@@ -22,7 +22,8 @@ include = [
     "*.bikey",
     "DiscordRichPresence*.dll",
 	"/addons/*.pbo",
-	"addons/*.bisign"
+	"addons/*.bisign",
+	"$PBOPREFIX$"
 ]
 exclude = [
     "*.psd",        # By default this list is empty

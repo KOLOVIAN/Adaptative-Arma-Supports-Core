@@ -24,8 +24,7 @@ class CfgPatches {
 			"cba_main",
             "A3_Data_F", 
             "A3_Modules_F", 
-            "A3_Modules_F_Curator", 
-            "cba_main", 
+            "A3_Modules_F_Curator",  
             "cba_settings",
             "3DEN" // Forces mod to load AFTER the Eden Editor
 			};

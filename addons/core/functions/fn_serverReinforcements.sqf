@@ -164,11 +164,80 @@ private _fnc_parseClass = {
     [_class, _loadout]
 };
 
+// --- GROUND TRANSIT WATCHDOG ---
+// Monitors a ground vehicle moving to a destination. Auto-recovers from
+// flips (vectorUp Z < 0.5) and stuck states (<5m progress over 15s) by
+// teleporting 10m toward the destination. Enforces a hard transit timeout.
+//
+// Args:
+//   _veh        - vehicle to watch
+//   _dest       - destination position
+//   _arrivalRad - arrival radius in meters
+//   _maxTime    - hard transit timeout in seconds
+//
+// Returns:
+//   "ARRIVED" - within radius, OR alive but canMove false (immobilized in place)
+//   "DEAD"    - vehicle is no longer alive
+//   "TIMEOUT" - exceeded _maxTime; caller is responsible for cleanup
+private _fnc_groundWatchdog = {
+    params ["_veh", "_dest", "_arrivalRad", "_maxTime"];
+    
+    private _start = serverTime;
+    private _lastPos = getPosATL _veh;
+    private _stuckSeconds = 0;
+    private _tickInterval = 3;
+    private _stuckThreshold = 15;
+    private _flipThreshold = 0.5;
+    private _result = "TIMEOUT";
+    
+    while { true } do {
+        sleep _tickInterval;
+        
+        // Exit conditions checked first so we never "recover" a vehicle that just arrived
+        if (!alive _veh) exitWith { _result = "DEAD" };
+        if ((_veh distance2D _dest) < _arrivalRad) exitWith { _result = "ARRIVED" };
+        if (!canMove _veh) exitWith { _result = "ARRIVED" }; // Immobilized-in-place: still useful, treat as arrival
+        if ((serverTime - _start) > _maxTime) exitWith { _result = "TIMEOUT" };
+        
+        private _bearing = _veh getDir _dest;
+        private _curPos = getPosATL _veh;
+        
+        // Flip detection — tilted past ~60 degrees
+        if (((vectorUp _veh) select 2) < _flipThreshold) then {
+            private _newPos = _veh getPos [10, _bearing];
+            _newPos set [2, 0];
+            _veh setVectorUp [0, 0, 1];
+            _veh setPos _newPos;
+            _veh setDir _bearing;
+            _stuckSeconds = 0;
+            _lastPos = getPosATL _veh;
+            diag_log format ["[AAS Reinf] Watchdog flip-recovered %1 toward %2", typeOf _veh, _dest];
+        } else {
+            // Stuck detection — <5m progress in tick window
+            if ((_curPos distance2D _lastPos) < 5) then {
+                _stuckSeconds = _stuckSeconds + _tickInterval;
+                if (_stuckSeconds >= _stuckThreshold) then {
+                    private _newPos = _veh getPos [10, _bearing];
+                    _newPos set [2, 0];
+                    _veh setPos _newPos;
+                    _stuckSeconds = 0;
+                    diag_log format ["[AAS Reinf] Watchdog unstuck %1 toward %2", typeOf _veh, _dest];
+                };
+            } else {
+                _stuckSeconds = 0;
+            };
+            _lastPos = getPosATL _veh;
+        };
+    };
+    
+    _result
+};
+
 // =========================================================================
 // --- 4. EXECUTION THREAD ---
 // =========================================================================
-[_caller, _dropPos, _playerSide, _isArmor, _isAir, _isMech, _isPara, _vehicleClassRaw, _squadSize, _behaviorMode, _rtbTime, _troopClasses, _fnc_parseClass] spawn {
-    params ["_caller", "_dropPos", "_playerSide", "_isArmor", "_isAir", "_isMech", "_isPara", "_vehicleClassRaw", "_squadSize", "_behaviorMode", "_rtbTime", "_troopClasses", "_fnc_parseClass"];
+[_caller, _dropPos, _playerSide, _isArmor, _isAir, _isMech, _isPara, _vehicleClassRaw, _squadSize, _behaviorMode, _rtbTime, _troopClasses, _fnc_parseClass, _fnc_groundWatchdog] spawn {
+    params ["_caller", "_dropPos", "_playerSide", "_isArmor", "_isAir", "_isMech", "_isPara", "_vehicleClassRaw", "_squadSize", "_behaviorMode", "_rtbTime", "_troopClasses", "_fnc_parseClass", "_fnc_groundWatchdog"];
 
     // Realistic 30 Seconds Delay for Ground forces
     if (_isArmor || _isMech) then { sleep 7; };
@@ -235,7 +304,6 @@ private _fnc_parseClass = {
     // Apply strict immortality to vehicle and crew for transit
     _vehicle allowDamage false;
     
-    // [FIX 1] Fixed the nested _x override issue by declaring _crewMember
     { 
         private _crewMember = _x;
         _crewMember allowDamage false; 
@@ -260,10 +328,17 @@ private _fnc_parseClass = {
         _wpLand setWaypointSpeed "FULL";
         _wpLand setWaypointCompletionRadius 50;
 
-        // Wait until arrived or destroyed
-        waitUntil { sleep 1; (_vehicle distance2D _dropPos) < 100 || !alive _vehicle };
+        // Wait until arrived, dead, or transit timeout (200s).
+        // Watchdog auto-recovers flips and stuck conditions during transit.
+        private _transitResult = [_vehicle, _dropPos, 100, 200] call _fnc_groundWatchdog;
         
-        if (!alive _vehicle) exitWith {};
+        if (_transitResult == "DEAD") exitWith {};
+        if (_transitResult == "TIMEOUT") exitWith {
+            diag_log format ["[AAS Reinf] Armor reinforcement timed out, despawning %1", typeOf _vehicle];
+            { deleteVehicle _x } forEach crew _vehicle;
+            deleteVehicle _vehicle;
+        };
+        // "ARRIVED" — continue with post-arrival logic
 
         // 120s Immortality Buff
         [_vehicle] spawn {
@@ -346,35 +421,52 @@ private _fnc_parseClass = {
             _unitToSpawn pushBack (_troopClasses select ((_i - 1) mod 4));
         };
 
+        // --- NEW: DELAYED OVERFLOW SPAWNING LOGIC ---
+        private _maxCargo = _vehicle emptyPositions "cargo";
+        private _overflowData = [];
+        private _spawnedCount = 0;
+
         {
             private _unitParsed = [_x] call _fnc_parseClass;
             private _unitClass = _unitParsed select 0;
             private _unitLoadout = _unitParsed select 1;
 
-            private _unit = _reinfGroup createUnit [_unitClass, _spawnPos, [], 0, "NONE"];
-            if (_unitLoadout isNotEqualTo false) then {
-                if (_unitLoadout isEqualType []) then { _unit setUnitLoadout _unitLoadout; };
-                if (_unitLoadout isEqualType "") then { _unit call compile _unitLoadout; };
+            if (_spawnedCount < _maxCargo) then {
+                private _unit = _reinfGroup createUnit [_unitClass, _spawnPos, [], 0, "NONE"];
+                if (_unitLoadout isNotEqualTo false) then {
+                    if (_unitLoadout isEqualType []) then { _unit setUnitLoadout _unitLoadout; };
+                    if (_unitLoadout isEqualType "") then { _unit call compile _unitLoadout; };
+                };
+
+                // Troops start immortal to survive transit
+                _unit allowDamage false;
+                _unit addRating 100000; 
+                [_unit] joinSilent _reinfGroup; 
+                _unit setCaptive false; 
+
+                // Infantry uses _unit instead of _x, so it doesn't conflict with the skill string array
+                { _unit setSkill [_x, 1]; } forEach ["aimingAccuracy", "aimingShake", "aimingSpeed", "spotDistance", "spotTime", "commanding", "courage", "reloadSpeed"];
+
+                _unit moveInCargo _vehicle;
+                _squad pushBack _unit;
+                _spawnedCount = _spawnedCount + 1;
+            } else {
+                // Vehicle is full! Save unit data and skip spawning them until we reach the LZ
+                _overflowData pushBack [_unitClass, _unitLoadout];
             };
-
-            // Troops start immortal to survive transit
-            _unit allowDamage false;
-            _unit addRating 100000; 
-            [_unit] joinSilent _reinfGroup; 
-            _unit setCaptive false; 
-
-            // Infantry uses _unit instead of _x, so it doesn't conflict with the skill string array
-            { _unit setSkill [_x, 1]; } forEach ["aimingAccuracy", "aimingShake", "aimingSpeed", "spotDistance", "spotTime", "commanding", "courage", "reloadSpeed"];
-
-            _unit moveInCargo _vehicle;
-            _squad pushBack _unit;
         } forEach _unitToSpawn;
+
+        // Lock the cargo seats so the AI squad leader CANNOT order a dismount mid-transit
+        _vehicle lockCargo true;
+        
+        // Force the squad itself into a passive state so they don't try to engage enemies while driving
+        _reinfGroup setBehaviour "CARELESS";
+        _reinfGroup setCombatMode "BLUE";
 
         // Transport Pathing
         _vehGroup setBehaviour "CARELESS"; 
         _vehGroup setCombatMode "BLUE";
         
-        // [FIX 2] disableAI expects an Object (Unit), not a Group. 
         if (_isAir) then {
             {
                 private _aiFeature = _x;
@@ -395,7 +487,7 @@ private _fnc_parseClass = {
             if (_isAir) then {
                 _wpLand setWaypointStatements ["true", "(vehicle this) land 'LAND';"];
             } else {
-                _wpLand setWaypointCompletionRadius 50; // Ensure completion radius aligns with the 50m wait check
+                _wpLand setWaypointCompletionRadius 50; 
             };
         };
 
@@ -422,13 +514,16 @@ private _fnc_parseClass = {
         };
 
         // --- UNLOAD & EXTRACT THREAD ---
-        [_vehicle, _vehGroup, _reinfGroup, _squad, _spawnPos, _dropPos, _caller, _rtbTime, _behaviorMode, _isPara, _isAir] spawn {
-            params ["_vehicle", "_vehGroup", "_reinfGroup", "_squad", "_spawnPos", "_dropPos", "_caller", "_rtbTime", "_behaviorMode", "_isPara", "_isAir"];
+        // Pass _overflowData directly into the thread so it knows who to spawn
+        [_vehicle, _vehGroup, _reinfGroup, _squad, _spawnPos, _dropPos, _caller, _rtbTime, _behaviorMode, _isPara, _isAir, _fnc_groundWatchdog, _overflowData] spawn {
+            params ["_vehicle", "_vehGroup", "_reinfGroup", "_squad", "_spawnPos", "_dropPos", "_caller", "_rtbTime", "_behaviorMode", "_isPara", "_isAir", "_fnc_groundWatchdog", "_overflowData"];
+            scopeName "unloadThread";
 
             // 1. Unloading Sequence
             if (_isPara) then {
                 waitUntil { sleep 0.5; (_vehicle distance2D _dropPos) < 300 || !alive _vehicle };
                 if (alive _vehicle) then {
+                    _vehicle lockCargo false; // Unlock before jump
                     {
                         unassignVehicle _x;
                         moveOut _x;
@@ -445,9 +540,19 @@ private _fnc_parseClass = {
                     if (alive _vehicle) then { _vehicle engineOn false; sleep 1; };
                 } else {
                     // GROUND TRANSPORT HALT LOGIC:
-                    // Wait strictly until it hits the 55m radius (5m buffer) or is immobilized.
-                    // Removed 'speed == 0' so it doesn't dismount randomly when dodging a tree.
-                    waitUntil { sleep 1; (_vehicle distance2D _dropPos) <= 55 || !alive _vehicle || !canMove _vehicle };
+                    // Watchdog enforces 200s transit timeout and auto-recovers flips/stuck.
+                    // Immobilized vehicles (canMove false) are treated as ARRIVED, so troops
+                    // dismount on the spot rather than getting deleted along with a broken truck.
+                    private _transitResult = [_vehicle, _dropPos, 55, 200] call _fnc_groundWatchdog;
+                    
+                    if (_transitResult == "TIMEOUT") then {
+                        diag_log format ["[AAS Reinf] Mech reinforcement timed out, despawning %1 with %2 troops", typeOf _vehicle, count _squad];
+                        // Despawn full reinforcement: troops aboard + crew + vehicle
+                        { deleteVehicle _x } forEach _squad;
+                        { deleteVehicle _x } forEach crew _vehicle;
+                        deleteVehicle _vehicle;
+                        breakOut "unloadThread";
+                    };
                     
                     if (alive _vehicle) then {
                         // Force the AI driver to hit the brakes immediately
@@ -457,6 +562,7 @@ private _fnc_parseClass = {
                 };
 
                 if (alive _vehicle) then {
+                    _vehicle lockCargo false; // UNLOCK DOORS so troops can get out
                     {
                         unassignVehicle _x;
                         _x action ["GetOut", _vehicle]; 
@@ -467,6 +573,35 @@ private _fnc_parseClass = {
 
             // Wait until everyone is out of the vehicle
             waitUntil { sleep 0.5; ({alive _x && _x in _vehicle} count _squad) == 0 || !alive _vehicle };
+
+            // --- DELAYED OVERFLOW SPAWN (For troops that couldn't fit in the transport) ---
+            if (count _overflowData > 0) then {
+                private _spawnCenter = if (alive _vehicle) then { getPosATL _vehicle } else { _dropPos };
+                if (_isPara) then { _spawnCenter = _dropPos; _spawnCenter set [2, 0]; }; 
+                
+                {
+                    _x params ["_uClass", "_uLoadout"];
+                    
+                    // Drop them securely near the vehicle in a staggered radius
+                    private _pos = _spawnCenter getPos [5 + random 10, random 360];
+                    private _unit = _reinfGroup createUnit [_uClass, _pos, [], 0, "NONE"];
+                    
+                    if (_uLoadout isNotEqualTo false) then {
+                        if (_uLoadout isEqualType []) then { _unit setUnitLoadout _uLoadout; };
+                        if (_uLoadout isEqualType "") then { _unit call compile _uLoadout; };
+                    };
+                    
+                    _unit allowDamage false; // Will be made mortal in 90 seconds like the rest
+                    _unit addRating 100000;
+                    [_unit] joinSilent _reinfGroup;
+                    _unit setCaptive false;
+                    
+                    { _unit setSkill [_x, 1]; } forEach ["aimingAccuracy", "aimingShake", "aimingSpeed", "spotDistance", "spotTime", "commanding", "courage", "reloadSpeed"];
+                    
+                    // Push them into the main squad array so they get the immortal removal & RTB despawn
+                    _squad pushBack _unit;
+                } forEach _overflowData;
+            };
 
             // 2. Dynamic Infantry Behavior
             switch (_behaviorMode) do {
