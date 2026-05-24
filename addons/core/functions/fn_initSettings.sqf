@@ -316,36 +316,47 @@ AAS_VanillaDefaults = [
 ];
 
 // Build dropdown from installed templates in profile
-private _registry = profileNamespace getVariable ["AAS_Template_Registry", []];
+AAS_Template_Registry_Cache = profileNamespace getVariable ["AAS_Template_Registry", []];
+
+private _registry = AAS_Template_Registry_Cache;
 private _names    = ["— Default (Vanilla NATO) —"] + (_registry apply { _x select 0 });
-private _indices  = [0] + (_registry apply { _forEachIndex + 1 });
+private _values   = ["__default__"]               + (_registry apply { _x select 0 });
+
+AAS_Template_UI_Ready = false;
 
 ["AAS_Selected_Template", "LIST",
-    ["Faction Template", "Select an installed faction template. Place an [AAS TEMPLATE] composition via Zeus to install one permanently."],
+    ["Faction Template", "Select an installed faction template. Place an [AAS FACTION] composition via Zeus to install one permanently."],
     ["AAS - CORE SETTINGS", "3. Faction Templates"],
-    [_indices, _names, 0],
+    [_values, _names, 0],
     false,
     {
-        params ["_idx"];
-        if (_idx == 0) then {
+        params ["_val"];
+        if (!AAS_Template_UI_Ready) exitWith {};
+
+        if (_val == "__default__") then {
             { [_x select 0, _x select 1, 2, "server"] call CBA_settings_fnc_set; } forEach AAS_VanillaDefaults;
             profileNamespace setVariable ["AAS_ActiveTemplate", []];
             saveProfileNamespace;
-            "AAS HQ: Reset to Vanilla NATO defaults." remoteExec ["systemChat", 0];
+            "[AAS] Reset to Vanilla NATO defaults." remoteExec ["systemChat", 0];
         } else {
-            private _reg = profileNamespace getVariable ["AAS_Template_Registry", []];
-            private _t   = (_reg select (_idx - 1)) select 1;
+            private _idx = AAS_Template_Registry_Cache findIf { (_x select 0) == _val };
+
+            if (_idx < 0) exitWith {
+                "[AAS] Template not found — reinstall the composition." remoteExec ["systemChat", 0];
+            };
+
+            private _t = (AAS_Template_Registry_Cache select _idx) select 1;
             { [_x select 0, _x select 1, 2, "server"] call CBA_settings_fnc_set; } forEach _t;
             profileNamespace setVariable ["AAS_ActiveTemplate", _t];
             saveProfileNamespace;
-            (format ["AAS HQ: '%1' faction template applied.", (_reg select (_idx - 1)) select 0]) remoteExec ["systemChat", 0];
+            (format ["[AAS] '%1' faction template applied.", _val]) remoteExec ["systemChat", 0];
         };
     }
 ] call CBA_fnc_addSetting;
 
-// On mission start: re-apply the last active template (overrides CBA defaults)
 [] spawn {
     waitUntil { time > 0 };
+    AAS_Template_UI_Ready = true;
     private _active = profileNamespace getVariable ["AAS_ActiveTemplate", []];
     if (count _active > 0) then {
         { [_x select 0, _x select 1, 2, "server"] call CBA_settings_fnc_set; } forEach _active;
