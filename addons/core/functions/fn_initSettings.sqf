@@ -165,24 +165,185 @@ private _indices  = [-1]            + (_registry apply { _forEachIndex });
 // --- FACTION TEMPLATES ---
 // ==========================================
 
+// Hardcoded Vanilla NATO defaults — used by the reset option
+AAS_VanillaDefaults = [
+    /* Supply */
+    ["AAS_Heli_Supply",                  "B_Heli_Light_01_F"                 ],
+    /* Close Air Support */
+    ["AAS_CAS_Gunship_Class",            "B_T_VTOL_01_armed_F"               ],
+    ["AAS_CAS_Gunship_Height",           "400"                               ],
+    ["AAS_CAS_Gunship_Orbit",            true                                ],
+    ["AAS_CAS_Gunship_Radius",           "1000"                              ],
+    ["AAS_CAS_Heli_Class",               "B_Heli_Attack_01_dynamicLoadout_F" ],
+    ["AAS_CAS_Plane_Class",              "B_Plane_CAS_01_dynamicLoadout_F"   ],
+    /* Reinforcements - Airborne */
+    ["AAS_Reinf_Air_SL",                 "B_Soldier_SL_F"                    ],
+    ["AAS_Reinf_Air_Sniper",             "B_soldier_M_F"                     ],
+    ["AAS_Reinf_Air_AT",                 "B_soldier_LAT_F"                   ],
+    ["AAS_Reinf_Air_AR",                 "B_soldier_AR_F"                    ],
+    ["AAS_Reinf_Air_LightHeli",          "B_Heli_Light_01_F"                 ],
+    ["AAS_Reinf_Air_StdHeli",            "B_Heli_Transport_01_F"             ],
+    ["AAS_Reinf_Air_Plane",              "B_T_VTOL_01_infantry_F"            ],
+    /* Reinforcements - Ground */
+    ["AAS_Reinf_Ground_SL",              "B_Soldier_SL_F"                    ],
+    ["AAS_Reinf_Ground_Sniper",          "B_soldier_M_F"                     ],
+    ["AAS_Reinf_Ground_AT",              "B_soldier_LAT_F"                   ],
+    ["AAS_Reinf_Ground_AR",              "B_soldier_AR_F"                    ],
+    ["AAS_Reinf_Ground_MRAP",            "B_MRAP_01_F"                       ],
+    ["AAS_Reinf_Ground_APC",             "B_APC_Wheeled_01_cannon_F"         ],
+    ["AAS_Reinf_Ground_Truck",           "B_Truck_01_transport_F"            ],
+    /* Reinforcements - Armor */
+    ["AAS_Reinf_Armor_Turret",           "B_MRAP_01_hmg_F"                   ],
+    ["AAS_Reinf_Armor_APC",              "B_APC_Tracked_01_rcws_F"           ],
+    ["AAS_Reinf_Armor_Tank",             "B_MBT_01_cannon_F"                 ],
+    /* QRF - Squad */
+    ["AQR_Squad_SL",                     "B_Soldier_SL_F"                    ],
+    ["AQR_Squad_MG",                     "B_autorifleman_F"                  ],
+    ["AQR_Squad_AT",                     "B_soldier_LAT_F"                   ],
+    ["AQR_Squad_Sniper",                 "B_sniper_F"                        ],
+    /* QRF - Amphibious */
+    ["AQR_Amphib_SL",                    "B_diver_TL_F"                      ],
+    ["AQR_Amphib_MG",                    "B_diver_AR_F"                      ],
+    ["AQR_Amphib_AT",                    "B_diver_exp_F"                     ],
+    ["AQR_Amphib_Sniper",                "B_diver_F"                         ],
+    /* QRF - Ground */
+    ["AQR_Ground_Turret",                "B_MRAP_01_hmg_F"                   ],
+    ["AQR_Ground_APC",                   "B_APC_Wheeled_01_cannon_F"         ],
+    /* QRF - Sea */
+    ["AQR_Sea_Boat",                     "B_Boat_Armed_01_minigun_F"         ],
+    ["AQR_Sea_Amphib",                   "B_APC_Wheeled_01_cannon_F"         ],
+    /* QRF - Air */
+    ["AQR_Heli_CAS",                     "B_Heli_Light_01_dynamicLoadout_F"  ],
+    ["AQR_Heli_Escort",                  "B_Heli_Attack_01_dynamicLoadout_F" ],
+    ["AQR_Heli_Heavy",                   "B_Heli_Transport_03_F"             ],
+    ["AQR_Plane_Class",                  "B_T_VTOL_01_vehicle_F"             ],
+    /* Airstrikes */
+    ["AAS_AS_Plane_GunRun",              "B_Plane_CAS_01_dynamicLoadout_F"   ],
+    ["AAS_AS_Plane_JDAM",                "B_Plane_Fighter_01_F"              ],
+    ["AAS_AS_Plane_MidnightSun",         "B_T_VTOL_01_vehicle_F"             ],
+    ["AAS_AS_Plane_UnguidedBomb",        "B_Plane_Fighter_01_F"              ],
+    ["AAS_AS_Toggle_Brrrt",              true                                ],
+    /* Logistics - Transport */
+    ["AAS_LOG_Comp_Heli",                "B_Heli_Transport_03_F"             ],
+    ["AAS_LOG_Transport_HeliClass",      "B_Heli_Transport_01_F"             ],
+    ["AAS_LOG_TransportHeavy_HeliClass", "B_Heli_Transport_03_F"             ],
+    /* Logistics - Equipment */
+    ["AAS_LOG_Equip1_Name",              "NATO Supplies"                     ],
+    ["AAS_LOG_Equip1_Class",             "B_CargoNet_01_ammo_F"              ],
+    ["AAS_LOG_Equip1_Heli",              "B_Heli_Light_01_F"                 ],
+    ["AAS_LOG_Equip1_Container",         false                               ],
+    ["AAS_LOG_Equip1_ForceRope",         false                               ],
+    ["AAS_LOG_Equip1_Mult",              "4.0"                               ],
+    ["AAS_LOG_Equip2_Name",              "OPFOR Supplies"                    ],
+    ["AAS_LOG_Equip2_Class",             "O_CargoNet_01_ammo_F"              ],
+    ["AAS_LOG_Equip2_Heli",              "B_Heli_Light_01_F"                 ],
+    ["AAS_LOG_Equip2_Container",         false                               ],
+    ["AAS_LOG_Equip2_ForceRope",         false                               ],
+    ["AAS_LOG_Equip2_Mult",              "4.0"                               ],
+    ["AAS_LOG_Equip3_Name",              "AN/MPQ-105"                        ],
+    ["AAS_LOG_Equip3_Class",             "B_Radar_System_01_F"               ],
+    ["AAS_LOG_Equip3_Heli",              "B_Heli_Transport_03_F"             ],
+    ["AAS_LOG_Equip3_Container",         true                                ],
+    ["AAS_LOG_Equip3_ForceRope",         false                               ],
+    ["AAS_LOG_Equip3_Mult",              "6.0"                               ],
+    ["AAS_LOG_Equip4_Name",              "Praetorian 1C"                     ],
+    ["AAS_LOG_Equip4_Class",             "B_AAA_System_01_F"                 ],
+    ["AAS_LOG_Equip4_Heli",              "B_Heli_Transport_03_F"             ],
+    ["AAS_LOG_Equip4_Container",         true                                ],
+    ["AAS_LOG_Equip4_ForceRope",         false                               ],
+    ["AAS_LOG_Equip4_Mult",              "10.0"                              ],
+    ["AAS_LOG_Equip5_Name",              "Mk49 Spartan"                      ],
+    ["AAS_LOG_Equip5_Class",             "B_SAM_System_01_F"                 ],
+    ["AAS_LOG_Equip5_Heli",              "B_Heli_Transport_03_F"             ],
+    ["AAS_LOG_Equip5_Container",         true                                ],
+    ["AAS_LOG_Equip5_ForceRope",         false                               ],
+    ["AAS_LOG_Equip5_Mult",              "12.0"                              ],
+    ["AAS_LOG_Equip6_Name",              "MIM-145 Defender"                  ],
+    ["AAS_LOG_Equip6_Class",             "B_SAM_System_03_F"                 ],
+    ["AAS_LOG_Equip6_Heli",              "B_Heli_Transport_03_F"             ],
+    ["AAS_LOG_Equip6_Container",         true                                ],
+    ["AAS_LOG_Equip6_ForceRope",         false                               ],
+    ["AAS_LOG_Equip6_Mult",              "18.0"                              ],
+    /* Logistics - Vehicles */
+    ["AAS_LOG_Veh1_Name",                "Quadbike"                          ],
+    ["AAS_LOG_Veh1_Class",               "B_Quadbike_01_F"                   ],
+    ["AAS_LOG_Veh1_Heli",                "B_Heli_Light_01_F"                 ],
+    ["AAS_LOG_Veh1_Container",           false                               ],
+    ["AAS_LOG_Veh1_ForceRope",           false                               ],
+    ["AAS_LOG_Veh1_Mult",                "0.2"                               ],
+    ["AAS_LOG_Veh2_Name",                "Jeep"                              ],
+    ["AAS_LOG_Veh2_Class",               "C_Offroad_02_unarmed_F"            ],
+    ["AAS_LOG_Veh2_Heli",                "B_Heli_Transport_01_F"             ],
+    ["AAS_LOG_Veh2_Container",           false                               ],
+    ["AAS_LOG_Veh2_ForceRope",           false                               ],
+    ["AAS_LOG_Veh2_Mult",                "0.5"                               ],
+    ["AAS_LOG_Veh3_Name",                "Prowler HMG"                       ],
+    ["AAS_LOG_Veh3_Class",               "B_LSV_01_armed_F"                  ],
+    ["AAS_LOG_Veh3_Heli",                "B_Heli_Transport_01_F"             ],
+    ["AAS_LOG_Veh3_Container",           false                               ],
+    ["AAS_LOG_Veh3_ForceRope",           false                               ],
+    ["AAS_LOG_Veh3_Mult",                "2.0"                               ],
+    ["AAS_LOG_Veh4_Name",                "HEMTT Cargo"                       ],
+    ["AAS_LOG_Veh4_Class",               "B_Truck_01_transport_F"            ],
+    ["AAS_LOG_Veh4_Heli",                "B_Heli_Transport_03_F"             ],
+    ["AAS_LOG_Veh4_Container",           false                               ],
+    ["AAS_LOG_Veh4_ForceRope",           false                               ],
+    ["AAS_LOG_Veh4_Mult",                "2.0"                               ],
+    ["AAS_LOG_Veh5_Name",                "Hunter GMG"                        ],
+    ["AAS_LOG_Veh5_Class",               "B_MRAP_01_gmg_F"                   ],
+    ["AAS_LOG_Veh5_Heli",                "B_Heli_Transport_03_F"             ],
+    ["AAS_LOG_Veh5_Container",           false                               ],
+    ["AAS_LOG_Veh5_ForceRope",           false                               ],
+    ["AAS_LOG_Veh5_Mult",                "6.0"                               ],
+    ["AAS_LOG_Veh6_Name",                "AMV-7 Marshall"                    ],
+    ["AAS_LOG_Veh6_Class",               "B_APC_Wheeled_01_cannon_F"         ],
+    ["AAS_LOG_Veh6_Heli",                "B_Heli_Transport_03_F"             ],
+    ["AAS_LOG_Veh6_Container",           true                                ],
+    ["AAS_LOG_Veh6_ForceRope",           false                               ],
+    ["AAS_LOG_Veh6_Mult",                "10.0"                              ],
+    ["AAS_LOG_Veh7_Name",                "SDV Submersible"                   ],
+    ["AAS_LOG_Veh7_Class",               "B_SDV_01_F"                        ],
+    ["AAS_LOG_Veh7_Heli",                "B_Heli_Transport_01_F"             ],
+    ["AAS_LOG_Veh7_Container",           false                               ],
+    ["AAS_LOG_Veh7_ForceRope",           false                               ],
+    ["AAS_LOG_Veh7_Mult",                "2.0"                               ],
+    ["AAS_LOG_Veh8_Name",                "Armed Boat"                        ],
+    ["AAS_LOG_Veh8_Class",               "B_Boat_Armed_01_minigun_F"         ],
+    ["AAS_LOG_Veh8_Heli",                "B_Heli_Transport_03_F"             ],
+    ["AAS_LOG_Veh8_Container",           false                               ],
+    ["AAS_LOG_Veh8_ForceRope",           false                               ],
+    ["AAS_LOG_Veh8_Mult",                "4.0"                               ]
+];
+
+// Build dropdown from installed templates in profile
+private _registry = profileNamespace getVariable ["AAS_Template_Registry", []];
+private _names    = ["— Default (Vanilla NATO) —"] + (_registry apply { _x select 0 });
+private _indices  = [0] + (_registry apply { _forEachIndex + 1 });
+
 ["AAS_Selected_Template", "LIST",
-    ["Faction Template", "Select an installed faction template."],
+    ["Faction Template", "Select an installed faction template. Place an [AAS TEMPLATE] composition via Zeus to install one permanently."],
     ["AAS - CORE SETTINGS", "3. Faction Templates"],
     [_indices, _names, 0],
     false,
     {
         params ["_idx"];
-        if (_idx < 0) exitWith {};
-        private _reg = profileNamespace getVariable ["AAS_Template_Registry", []];
-        if (_idx >= count _reg) exitWith {};
-        private _t = (_reg select _idx) select 1;
-        { [_x select 0, _x select 1, 2, "server"] call CBA_settings_fnc_set; } forEach _t;
-        profileNamespace setVariable ["AAS_ActiveTemplate", _t];
-        saveProfileNamespace;
-        (format ["AAS HQ: '%1' applied.", (_reg select _idx) select 0]) call compile "systemChat";
+        if (_idx == 0) then {
+            { [_x select 0, _x select 1, 2, "server"] call CBA_settings_fnc_set; } forEach AAS_VanillaDefaults;
+            profileNamespace setVariable ["AAS_ActiveTemplate", []];
+            saveProfileNamespace;
+            "AAS HQ: Reset to Vanilla NATO defaults." remoteExec ["systemChat", 0];
+        } else {
+            private _reg = profileNamespace getVariable ["AAS_Template_Registry", []];
+            private _t   = (_reg select (_idx - 1)) select 1;
+            { [_x select 0, _x select 1, 2, "server"] call CBA_settings_fnc_set; } forEach _t;
+            profileNamespace setVariable ["AAS_ActiveTemplate", _t];
+            saveProfileNamespace;
+            (format ["AAS HQ: '%1' faction template applied.", (_reg select (_idx - 1)) select 0]) remoteExec ["systemChat", 0];
+        };
     }
 ] call CBA_fnc_addSetting;
 
+// On mission start: re-apply the last active template (overrides CBA defaults)
 [] spawn {
     waitUntil { time > 0 };
     private _active = profileNamespace getVariable ["AAS_ActiveTemplate", []];
