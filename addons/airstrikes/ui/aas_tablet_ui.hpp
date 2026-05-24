@@ -6,10 +6,10 @@ class AAS_AS_Tablet_Dialog {
     class controls {
         // --- 1. THE TABLET FRAME ---
         class TabletFrame {
-            idc = 8992;         // CHANGED FROM -1 SO THE SCRIPT CAN SWAP THE IMAGE
+            idc = 8992;         
             type = 0;           
-            style = 2096;       
-            text = "";          // OVERRIDDEN DYNAMICALLY BY SQF (AAS-CORE REGISTRY)
+            style = 2096;       // ST_PICTURE + ST_KEEP_ASPECT_RATIO
+            text = "";          
             colorText[] = {1, 1, 1, 1};
             colorBackground[] = {0, 0, 0, 0};
             font = "RobotoCondensed";
@@ -17,11 +17,15 @@ class AAS_AS_Tablet_Dialog {
             lineSpacing = 0;
             fixedWidth = 0;
             shadow = 0;
-            x = "safezoneX";
-            y = "safezoneY";
-            w = "safezoneW";
+            
+            // THE FIX: Lock the frame's bounding box to exactly 16:9 width
+            w = "1.3333 * safezoneH"; // Replaces safezoneW
             h = "safezoneH";
-        }; // <-- ADD THIS
+            
+            // Center this rigid bounding box perfectly on the screen
+            x = "safezoneX + (safezoneW / 2) - (0.6666 * safezoneH)"; 
+            y = "safezoneY";
+        };
 
         // --- 2. THE INTERACTIVE MAP ---
         class TabletMap {
@@ -29,10 +33,13 @@ class AAS_AS_Tablet_Dialog {
             type = 101;         
             style = 0;          
             
-            x = "0.258*safezoneW+safezoneX";
-            y = "0.251*safezoneH+safezoneY";
-            w = "0.48*safezoneW";
-            h = "0.459*safezoneH";
+            // THE FIX: Width locked to safezoneH (Original 0.48 * 1.3333 factor)
+            w = "0.64 * safezoneH"; 
+            h = "0.459 * safezoneH"; 
+
+            // THE FIX: Anchored to dead-center, offset to perfectly fit the bezel
+            x = "safezoneX + (safezoneW / 2) - (0.3226 * safezoneH)"; 
+            y = "safezoneY + 0.251 * safezoneH";
 
             // --- MANDATORY ENGINE PROPERTIES ---
             
