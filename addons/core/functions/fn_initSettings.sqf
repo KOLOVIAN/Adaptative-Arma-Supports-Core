@@ -155,3 +155,38 @@ private _themeNames = [];
 [ "AAS_Reinf_Armor_CostMult_Tank", "EDITBOX", ["Cost Multiplier: Tank", "Multiplies base cost."], ["AAS - Reinforcements", "3. Armor"], "8.0", 1 ] call CBA_fnc_addSetting;
 [ "AAS_Cooldown_Reinf_Armor", "EDITBOX", ["Armor Cooldown (Sec)", "Cooldown for Armor supports."], ["AAS - Reinforcements", "3. Armor"], "1200", 1 ] call CBA_fnc_addSetting;
 [ "AAS_RTB_Reinf_Armor", "EDITBOX", ["Armor RTB (Sec)", "Extraction time for Armor supports."], ["AAS - Reinforcements", "3. Armor"], "600", 1 ] call CBA_fnc_addSetting;
+
+private _registry = profileNamespace getVariable ["AAS_Template_Registry", []];
+private _names    = ["— Default —"] + (_registry apply { _x select 0 });
+private _indices  = [-1]            + (_registry apply { _forEachIndex });
+
+
+// ==========================================
+// --- FACTION TEMPLATES ---
+// ==========================================
+
+["AAS_Selected_Template", "LIST",
+    ["Faction Template", "Select an installed faction template."],
+    ["AAS - CORE SETTINGS", "3. Faction Templates"],
+    [_indices, _names, 0],
+    false,
+    {
+        params ["_idx"];
+        if (_idx < 0) exitWith {};
+        private _reg = profileNamespace getVariable ["AAS_Template_Registry", []];
+        if (_idx >= count _reg) exitWith {};
+        private _t = (_reg select _idx) select 1;
+        { [_x select 0, _x select 1, 2, "server"] call CBA_settings_fnc_set; } forEach _t;
+        profileNamespace setVariable ["AAS_ActiveTemplate", _t];
+        saveProfileNamespace;
+        (format ["AAS HQ: '%1' applied.", (_reg select _idx) select 0]) call compile "systemChat";
+    }
+] call CBA_fnc_addSetting;
+
+[] spawn {
+    waitUntil { time > 0 };
+    private _active = profileNamespace getVariable ["AAS_ActiveTemplate", []];
+    if (count _active > 0) then {
+        { [_x select 0, _x select 1, 2, "server"] call CBA_settings_fnc_set; } forEach _active;
+    };
+};
