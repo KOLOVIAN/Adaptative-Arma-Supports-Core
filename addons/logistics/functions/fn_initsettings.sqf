@@ -99,8 +99,8 @@
 [ "AAS_LOG_Veh6_Name", "EDITBOX", ["Vehicle 6: Name", "Support name shown on the terminal."], ["AAS - Logistics", "4. Delivery (Vehicles)"], "AMV-7 Marshall", 1 ] call CBA_fnc_addSetting;
 [ "AAS_LOG_Veh6_Class", "EDITBOX", ["Vehicle 6: Classname", "Classname or custom array."], ["AAS - Logistics", "4. Delivery (Vehicles)"], "B_APC_Wheeled_01_cannon_F", 1 ] call CBA_fnc_addSetting;
 [ "AAS_LOG_Veh6_Heli", "EDITBOX", ["Vehicle 6: Delivery Heli", "Helicopter used for slingloading."], ["AAS - Logistics", "4. Delivery (Vehicles)"], "B_Heli_Transport_03_F", 1 ] call CBA_fnc_addSetting;
-[ "AAS_LOG_Veh6_Container", "CHECKBOX", ["Vehicle 6: Containerized", "Check to drop a pod that transforms into the vehicle manually."], ["AAS - Logistics", "4. Delivery (Vehicles)"], true, 1 ] call CBA_fnc_addSetting;
-[ "AAS_LOG_Veh6_ForceRope", "CHECKBOX", ["Vehicle 6: Force Custom Ropes", "Bypasses vanilla slingloading restrictions via scripted ropes."], ["AAS - Logistics", "4. Delivery (Vehicles)"], false, 1 ] call CBA_fnc_addSetting;
+[ "AAS_LOG_Veh6_Container", "CHECKBOX", ["Vehicle 6: Containerized", "Check to drop a pod that transforms into the vehicle manually."], ["AAS - Logistics", "4. Delivery (Vehicles)"], false, 1 ] call CBA_fnc_addSetting;
+[ "AAS_LOG_Veh6_ForceRope", "CHECKBOX", ["Vehicle 6: Force Custom Ropes", "Bypasses vanilla slingloading restrictions via scripted ropes."], ["AAS - Logistics", "4. Delivery (Vehicles)"], true, 1 ] call CBA_fnc_addSetting;
 [ "AAS_LOG_Veh6_Mult", "EDITBOX", ["Vehicle 6: Cost Multiplier", "Multiplies the Base Cost."], ["AAS - Logistics", "4. Delivery (Vehicles)"], "10.0", 1 ] call CBA_fnc_addSetting;
 
 // Vehicle 7
@@ -144,8 +144,8 @@
 [ "AAS_LOG_Equip3_Name", "EDITBOX", ["Equipment 3: Name", "Support name shown on the terminal."], ["AAS - Logistics", "5. Delivery (Equipment)"], "AN/MPQ-105", 1 ] call CBA_fnc_addSetting;
 [ "AAS_LOG_Equip3_Class", "EDITBOX", ["Equipment 3: Classname", "Classname or custom array."], ["AAS - Logistics", "5. Delivery (Equipment)"], "B_Radar_System_01_F", 1 ] call CBA_fnc_addSetting;
 [ "AAS_LOG_Equip3_Heli", "EDITBOX", ["Equipment 3: Delivery Heli", "Helicopter used for slingloading."], ["AAS - Logistics", "5. Delivery (Equipment)"], "B_Heli_Transport_03_F", 1 ] call CBA_fnc_addSetting;
-[ "AAS_LOG_Equip3_Container", "CHECKBOX", ["Equipment 3: Containerized", "Check to drop a pod that transforms into the equipment manually."], ["AAS - Logistics", "5. Delivery (Equipment)"], true, 1 ] call CBA_fnc_addSetting;
-[ "AAS_LOG_Equip3_ForceRope", "CHECKBOX", ["Equipment 3: Force Custom Ropes", "Bypasses vanilla slingloading restrictions via scripted ropes."], ["AAS - Logistics", "5. Delivery (Equipment)"], false, 1 ] call CBA_fnc_addSetting;
+[ "AAS_LOG_Equip3_Container", "CHECKBOX", ["Equipment 3: Containerized", "Check to drop a pod that transforms into the equipment manually."], ["AAS - Logistics", "5. Delivery (Equipment)"], false, 1 ] call CBA_fnc_addSetting;
+[ "AAS_LOG_Equip3_ForceRope", "CHECKBOX", ["Equipment 3: Force Custom Ropes", "Bypasses vanilla slingloading restrictions via scripted ropes."], ["AAS - Logistics", "5. Delivery (Equipment)"], true, 1 ] call CBA_fnc_addSetting;
 [ "AAS_LOG_Equip3_Mult", "EDITBOX", ["Equipment 3: Cost Multiplier", "Multiplies the Base Cost."], ["AAS - Logistics", "5. Delivery (Equipment)"], "6.0", 1 ] call CBA_fnc_addSetting;
 
 // Equipment 4
@@ -168,8 +168,8 @@
 [ "AAS_LOG_Equip6_Name", "EDITBOX", ["Equipment 6: Name", "Support name shown on the terminal."], ["AAS - Logistics", "5. Delivery (Equipment)"], "MIM-145 Defender", 1 ] call CBA_fnc_addSetting;
 [ "AAS_LOG_Equip6_Class", "EDITBOX", ["Equipment 6: Classname", "Classname or custom array."], ["AAS - Logistics", "5. Delivery (Equipment)"], "B_SAM_System_03_F", 1 ] call CBA_fnc_addSetting;
 [ "AAS_LOG_Equip6_Heli", "EDITBOX", ["Equipment 6: Delivery Heli", "Helicopter used for slingloading."], ["AAS - Logistics", "5. Delivery (Equipment)"], "B_Heli_Transport_03_F", 1 ] call CBA_fnc_addSetting;
-[ "AAS_LOG_Equip6_Container", "CHECKBOX", ["Equipment 6: Containerized", "Check to drop a pod that transforms into the equipment manually."], ["AAS - Logistics", "5. Delivery (Equipment)"], true, 1 ] call CBA_fnc_addSetting;
-[ "AAS_LOG_Equip6_ForceRope", "CHECKBOX", ["Equipment 6: Force Custom Ropes", "Bypasses vanilla slingloading restrictions via scripted ropes."], ["AAS - Logistics", "5. Delivery (Equipment)"], false, 1 ] call CBA_fnc_addSetting;
+[ "AAS_LOG_Equip6_Container", "CHECKBOX", ["Equipment 6: Containerized", "Check to drop a pod that transforms into the equipment manually."], ["AAS - Logistics", "5. Delivery (Equipment)"], false, 1 ] call CBA_fnc_addSetting;
+[ "AAS_LOG_Equip6_ForceRope", "CHECKBOX", ["Equipment 6: Force Custom Ropes", "Bypasses vanilla slingloading restrictions via scripted ropes."], ["AAS - Logistics", "5. Delivery (Equipment)"], true, 1 ] call CBA_fnc_addSetting;
 [ "AAS_LOG_Equip6_Mult", "EDITBOX", ["Equipment 6: Cost Multiplier", "Multiplies the Base Cost."], ["AAS - Logistics", "5. Delivery (Equipment)"], "18.0", 1 ] call CBA_fnc_addSetting;
 
 // ==========================================
