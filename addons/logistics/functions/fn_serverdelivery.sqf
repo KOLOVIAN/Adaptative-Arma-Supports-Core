@@ -197,10 +197,10 @@ _payloadObj allowDamage false;
 // --- DYNAMIC HOOKUP (VANILLA OR FORCE ROPES) ---
 if (_forceRope) then {
     private _ropeLength = 15;
-    ropeCreate [_heli, [0, 0, -2], _payloadObj, [1.5, 1.5, 0], _ropeLength];
-    ropeCreate [_heli, [0, 0, -2], _payloadObj, [-1.5, 1.5, 0], _ropeLength];
-    ropeCreate [_heli, [0, 0, -2], _payloadObj, [1.5, -1.5, 0], _ropeLength];
-    ropeCreate [_heli, [0, 0, -2], _payloadObj, [-1.5, -1.5, 0], _ropeLength];
+    ropeCreate [_heli, [0, 0, -2], _payloadObj, [1.0, 1.0, 0], _ropeLength];
+    ropeCreate [_heli, [0, 0, -2], _payloadObj, [-1.0, 1.0, 0], _ropeLength];
+    ropeCreate [_heli, [0, 0, -2], _payloadObj, [1.0, -1.0, 0], _ropeLength];
+    ropeCreate [_heli, [0, 0, -2], _payloadObj, [-1.0, -1.0, 0], _ropeLength];
     
     // TRANSIT FIX: Cap transit speed so the custom pendulum doesn't flip the heli
     _heli limitSpeed 110; 
