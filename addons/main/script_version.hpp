@@ -1,7 +1,7 @@
 #define MAJOR 2
-#define MINOR 14
+#define MINOR 15
 #define PATCH 0
-#define BUILD 54
+#define BUILD 55
 
 // #define VERSION MACROS
 #define VERSION MAJOR.MINOR
