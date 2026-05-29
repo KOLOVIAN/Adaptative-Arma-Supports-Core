@@ -5,6 +5,7 @@
     allows mid-flight redirects (locked on final approach), handles dynamic radio comms,
     and includes a live-updating map marker for the extraction countdown.
     *Now supports Dynamic Standard/Heavy classes and Adjustable Flight Altitude.*
+    *Now includes parallel Watchdog for behavioral safety + AI mod resistance.*
 */
 
 // FIX: Added _transportType parameter
@@ -141,7 +142,13 @@ _heliGroup setSpeedMode "FULL";
 
 _heli setVariable ["AAS_Original_Crew", crew _heli];
 
-{ _heliGroup disableAI _x } forEach ["AUTOTARGET", "TARGET", "SUPPRESSION", "AUTOCOMBAT", "MINEDETECTION"];
+// FSM/COVER/CHECKVISIBLE added: shuts down the danger reaction state machine
+// that was causing the heli to avoid MLRS/airstrike impact zones and climb indefinitely.
+// Applied per-unit because group syntax doesn't accept FSM/COVER/CHECKVISIBLE sections.
+{
+    private _unit = _x;
+    { _unit disableAI _x } forEach ["AUTOTARGET", "TARGET", "SUPPRESSION", "AUTOCOMBAT", "MINEDETECTION", "FSM", "COVER", "CHECKVISIBLE"];
+} forEach (crew _heli);
 
 private _flightHeight = missionNamespace getVariable ["AAS_LOG_Transport_FlightHeight", 70];
 _heli flyInHeight _flightHeight; 
@@ -151,6 +158,215 @@ private _wpLand = _heliGroup addWaypoint [_lz, 0];
 _wpLand setWaypointType "MOVE";
 _wpLand setWaypointSpeed "FULL";
 _wpLand setWaypointStatements ["true", "(vehicle this) land 'GET IN';"]; 
+
+// ==========================================
+// --- 4b. WATCHDOG (BEHAVIORAL SAFETY MONITOR) ---
+// Parallel monitor. Reads phase/target/engine state from heli vars
+// and applies tiered corrective actions (soft -> velocity -> teleport).
+// Runs unconditionally for behavior + altitude enforcement.
+// Engine killswitch sub-system only active when AAS_LOG_Transport_Clamp is true.
+// ==========================================
+_heli setVariable ["AAS_WD_Phase", "cruise_pickup", true];
+_heli setVariable ["AAS_WD_Target", _lz, true];
+_heli setVariable ["AAS_WD_EngineDesired", true, true];
+
+private _watchdogCode = {
+    params ["_heli", "_heliGroup", "_flightHeight"];
+
+    // Internal state init
+    _heli setVariable ["AAS_WD_CorrectionTier", 0];
+    _heli setVariable ["AAS_WD_LastCorrection", 0];
+    _heli setVariable ["AAS_WD_PrevEngine", true];
+    _heli setVariable ["AAS_WD_LastBehaviorRefresh", 0];
+    _heli setVariable ["AAS_WD_StuckPos", getPos _heli];
+    _heli setVariable ["AAS_WD_StuckTime", serverTime];
+    _heli setVariable ["AAS_WD_LastTarget", []];
+
+    private _aiDisableList = ["AUTOTARGET", "TARGET", "SUPPRESSION", "AUTOCOMBAT", "MINEDETECTION", "FSM", "COVER", "CHECKVISIBLE"];
+
+    // Tiered correction helper: A=flyInHeight, B=velocity push, C=teleport
+    private _fnc_applyCorrection = {
+        params ["_heli", "_expectedHeight", "_floor"];
+        private _tier = _heli getVariable ["AAS_WD_CorrectionTier", 0];
+        private _lastTime = _heli getVariable ["AAS_WD_LastCorrection", 0];
+        if (serverTime - _lastTime < 3) exitWith {};
+
+        _tier = _tier + 1;
+        _heli setVariable ["AAS_WD_CorrectionTier", _tier];
+        _heli setVariable ["AAS_WD_LastCorrection", serverTime];
+
+        switch (_tier) do {
+            case 1: {
+                _heli flyInHeight _floor;
+                diag_log format ["[AAS_LOG_WD] Tier 1 (soft): flyInHeight %1 | alt was %2", _floor, round((getPosATL _heli) select 2)];
+            };
+            case 2: {
+                private _vel = velocity _heli;
+                _vel set [2, -8];
+                _heli setVelocity _vel;
+                diag_log format ["[AAS_LOG_WD] Tier 2 (velocity): forcing -8 z-velocity | alt was %1", round((getPosATL _heli) select 2)];
+            };
+            default {
+                private _pos = getPosATL _heli;
+                _pos set [2, _floor max 1];
+                _heli setPosATL _pos;
+                _heli setVariable ["AAS_WD_CorrectionTier", 0];
+                diag_log format ["[AAS_LOG_WD] Tier 3 (teleport): forced to %1m ATL", _floor];
+            };
+        };
+    };
+
+    // --- Main loop ---
+    while {alive _heli && !isNull _heli} do {
+        sleep 1;
+        if (!alive _heli || isNull _heli) exitWith {};
+
+        private _phase = _heli getVariable ["AAS_WD_Phase", ""];
+        if (_phase isEqualTo "") then { continue };
+
+        // Resolve target (cruise_dropoff prefers redirect-aware var)
+        private _target = _heli getVariable ["AAS_WD_Target", []];
+        if (_phase == "cruise_dropoff") then {
+            _target = _heli getVariable ["AAS_Current_Target_Dest", _target];
+        };
+
+        private _engineDesired = _heli getVariable ["AAS_WD_EngineDesired", true];
+        private _clampEnabled = missionNamespace getVariable ["AAS_LOG_Transport_Clamp", false];
+        private _currentAlt = (getPosATL _heli) select 2;
+        private _aiCrew = (crew _heli) select { !isPlayer _x && alive _x };
+
+        // Reset stuck tracker on target change (handles redirects)
+        private _lastTarget = _heli getVariable ["AAS_WD_LastTarget", []];
+        if !(_target isEqualTo _lastTarget) then {
+            _heli setVariable ["AAS_WD_StuckPos", getPos _heli];
+            _heli setVariable ["AAS_WD_StuckTime", serverTime];
+            _heli setVariable ["AAS_WD_LastTarget", _target];
+        };
+
+        // === BEHAVIOR REFRESH (every 5s) ===
+        // Re-applies pacification settings periodically in case an AI mod overrides them.
+        private _lastRefresh = _heli getVariable ["AAS_WD_LastBehaviorRefresh", 0];
+        if (serverTime - _lastRefresh >= 5) then {
+            _heliGroup setBehaviour "CARELESS";
+            _heliGroup setCombatMode "BLUE";
+            _heliGroup setSpeedMode "FULL";
+            _heli setCaptive true;
+            { _x setCaptive true } forEach _aiCrew;
+            // Per-unit disableAI (group syntax doesn't accept FSM/COVER/CHECKVISIBLE)
+            {
+                private _unit = _x;
+                { _unit disableAI _x } forEach _aiDisableList;
+            } forEach _aiCrew;
+            _heli flyInHeight _flightHeight;
+            _heli setVariable ["AAS_WD_LastBehaviorRefresh", serverTime];
+        };
+
+        // === ENGINE KILLSWITCH (only when CBA clamp setting is true) ===
+        if (_clampEnabled) then {
+            private _prev = _heli getVariable ["AAS_WD_PrevEngine", true];
+
+            // Transition OFF -> ON: re-enable AI movement, restart engine
+            if (_engineDesired && !_prev) then {
+                { _x enableAI "MOVE" } forEach _aiCrew;
+                _heli engineOn true;
+            };
+
+            // Sustained kill: hold engine off, kill velocity, freeze AI movement
+            if (!_engineDesired) then {
+                _heli engineOn false;
+                _heli setVelocity [0,0,0];
+                { _x disableAI "MOVE" } forEach _aiCrew;
+            };
+
+            _heli setVariable ["AAS_WD_PrevEngine", _engineDesired];
+        };
+
+        // === ALTITUDE / POSITION ENFORCEMENT BY PHASE ===
+        switch (_phase) do {
+
+            case "cruise_pickup": {
+                private _dist = if (count _target > 1) then { _heli distance2D _target } else { 99999 };
+                if (_dist > 200) then {
+                    // Cruise mode: cap at 2x expected altitude
+                    if (_currentAlt > _flightHeight * 2) then {
+                        [_heli, _flightHeight, _flightHeight] call _fnc_applyCorrection;
+                    } else {
+                        _heli setVariable ["AAS_WD_CorrectionTier", 0];
+                    };
+                } else {
+                    // Final approach - should be descending toward LZ
+                    if (_currentAlt > _flightHeight) then {
+                        [_heli, _flightHeight, 5] call _fnc_applyCorrection;
+                    };
+                };
+            };
+
+            case "cruise_dropoff": {
+                private _dist = if (count _target > 1) then { _heli distance2D _target } else { 99999 };
+                if (_dist > 200) then {
+                    // Cruise mode: cap at 2x expected altitude
+                    if (_currentAlt > _flightHeight * 2) then {
+                        [_heli, _flightHeight, _flightHeight] call _fnc_applyCorrection;
+                    } else {
+                        _heli setVariable ["AAS_WD_CorrectionTier", 0];
+                    };
+
+                    // Stuck detection (cruise only)
+                    private _stuckPos = _heli getVariable ["AAS_WD_StuckPos", getPos _heli];
+                    private _stuckTime = _heli getVariable ["AAS_WD_StuckTime", serverTime];
+
+                    if ((_heli distance2D _stuckPos) > 50) then {
+                        _heli setVariable ["AAS_WD_StuckPos", getPos _heli];
+                        _heli setVariable ["AAS_WD_StuckTime", serverTime];
+                    } else {
+                        if (serverTime - _stuckTime > 30) then {
+                            diag_log format ["[AAS_LOG_WD] Stuck detected: re-issuing waypoint to %1", _target];
+                            while {(count (waypoints _heliGroup)) > 0} do {
+                                deleteWaypoint ((waypoints _heliGroup) select 0);
+                            };
+                            private _wp = _heliGroup addWaypoint [_target, 0];
+                            _wp setWaypointType "MOVE";
+                            _wp setWaypointSpeed "FULL";
+                            _wp setWaypointStatements ["true", "(vehicle this) land 'GET OUT';"];
+                            _heli setVariable ["AAS_WD_StuckPos", getPos _heli];
+                            _heli setVariable ["AAS_WD_StuckTime", serverTime];
+                        };
+                    };
+                } else {
+                    // Final approach
+                    if (_currentAlt > _flightHeight) then {
+                        [_heli, _flightHeight, 5] call _fnc_applyCorrection;
+                    };
+                };
+            };
+
+            case "boarding";
+            case "disembark": {
+                // Ground anchor. Skip tiers - heli must NOT be airborne in these phases.
+                if (_currentAlt > 3) then {
+                    private _pos = getPosATL _heli;
+                    _pos set [2, 0.5];
+                    _heli setPosATL _pos;
+                    _heli setVelocity [0,0,0];
+                    diag_log format ["[AAS_LOG_WD] Ground anchor (%1): forced to ground from %2m", _phase, round _currentAlt];
+                };
+            };
+
+            case "despawn": {
+                // Loosen ceiling - allow climb-out but cap absolute climb
+                if (_currentAlt > 300) then {
+                    [_heli, 150, 150] call _fnc_applyCorrection;
+                } else {
+                    _heli setVariable ["AAS_WD_CorrectionTier", 0];
+                };
+            };
+        };
+    };
+
+    diag_log format ["[AAS_LOG_WD] Watchdog terminating - heli alive: %1", alive _heli];
+};
+
+[_heli, _heliGroup, _flightHeight] spawn _watchdogCode;
 
 // ==========================================
 // --- 5. EXECUTION THREAD ---
@@ -181,32 +397,9 @@ _wpLand setWaypointStatements ["true", "(vehicle this) land 'GET IN';"];
         };
     };
 
-    // --- SCRIPTED ENGINE CLAMP HELPER ---
-    private _fnc_toggleClamp = {
-        params ["_heli", "_state"];
-        // Check if the optional compatibility clamp is enabled in CBA settings
-        private _useClamp = missionNamespace getVariable ["AAS_LOG_Transport_Clamp", false];
-        if (!_useClamp) exitWith {}; // 100% Ignored if toggled off
-
-        if (_state) then {
-            _heli setVariable ["AAS_Clamp_Active", true];
-            
-            // Aggressive loop to force the engine off
-            [_heli] spawn {
-                params ["_h"];
-                while {alive _h && _h getVariable ["AAS_Clamp_Active", false]} do {
-                    _h engineOn false;
-                    // Disable pathing just in case the AI tries to taxi without the engine
-                    { _x disableAI "PATH"; } forEach (crew _h select { !isPlayer _x });
-                    sleep 1;
-                };
-            };
-        } else {
-            _heli setVariable ["AAS_Clamp_Active", false];
-            { _x enableAI "PATH"; } forEach (crew _heli select { !isPlayer _x });
-            _heli engineOn true;
-        };
-    };
+    // NOTE: _fnc_toggleClamp removed - the Watchdog handles engine killswitch + ground anchor
+    // natively, gated by AAS_WD_EngineDesired var (set per-phase below) and the
+    // AAS_LOG_Transport_Clamp CBA setting.
 
     // --- PHASE 1: APPROACH INITIAL LZ ---
     waitUntil { sleep 1; _heli distance2D _lz < 300 || !alive _heli };
@@ -223,10 +416,11 @@ _wpLand setWaypointStatements ["true", "(vehicle this) land 'GET IN';"];
     waitUntil { sleep 2; isTouchingGround _heli || !alive _heli };
     if (!alive _heli) exitWith { deleteVehicle _helipad; };
 
-    // >>>> ACTIVATE ENGINE CLAMP <<<<
-    [_heli, true] call _fnc_toggleClamp;
+    // >>>> WATCHDOG: BOARDING PHASE <<<<
+    // Engine killswitch active (if clamp setting enabled), ground anchor enforced.
+    _heli setVariable ["AAS_WD_Phase", "boarding", true];
+    _heli setVariable ["AAS_WD_EngineDesired", false, true];
 
-    _heli engineOn true; // Ignored immediately if clamp loop is active
     _heli setVariable ["AAS_ReadyToGo", false, true];
 
     // --- PHASE 2: BOARDING & LIVE MARKER ---
@@ -265,8 +459,11 @@ _wpLand setWaypointStatements ["true", "(vehicle this) land 'GET IN';"];
 
     [_heli] remoteExec ["removeAllActions", 0, _heli];
     
-    // >>>> DEACTIVATE ENGINE CLAMP <<<<
-    [_heli, false] call _fnc_toggleClamp;
+    // >>>> WATCHDOG: CRUISE DROPOFF PHASE <<<<
+    // Engine released, target set to final dest (redirect-aware via AAS_Current_Target_Dest below).
+    _heli setVariable ["AAS_WD_Phase", "cruise_dropoff", true];
+    _heli setVariable ["AAS_WD_Target", _finalDest, true];
+    _heli setVariable ["AAS_WD_EngineDesired", true, true];
     
     _heli engineOn true;
 
@@ -391,6 +588,7 @@ _wpLand setWaypointStatements ["true", "(vehicle this) land 'GET IN';"];
             _heli setVariable ["AAS_New_Dest", [], true]; 
             _currentDest = _newDest;
             _heli setVariable ["AAS_Current_Target_Dest", _currentDest, true]; 
+            _heli setVariable ["AAS_WD_Target", _currentDest, true];
             _300mTriggered = false; 
             
             deleteVehicle (_heli getVariable ["AAS_Active_Pad", objNull]);
@@ -426,13 +624,15 @@ _wpLand setWaypointStatements ["true", "(vehicle this) land 'GET IN';"];
     waitUntil { sleep 2; isTouchingGround _heli || !alive _heli };
     if (!alive _heli) exitWith { deleteVehicle _helipad; deleteVehicle (_heli getVariable ["AAS_Active_Pad", objNull]); };
 
-    // >>>> ACTIVATE ENGINE CLAMP <<<<
-    [_heli, true] call _fnc_toggleClamp;
+    // >>>> WATCHDOG: DISEMBARK PHASE <<<<
+    // Engine killswitch active (if clamp setting enabled), ground anchor enforced.
+    _heli setVariable ["AAS_WD_Phase", "disembark", true];
+    _heli setVariable ["AAS_WD_Target", _currentDest, true];
+    _heli setVariable ["AAS_WD_EngineDesired", false, true];
 
     sleep 3;
     [_heli, _caller, "PILOT: Go, go, go, we have touched down. Dismount.", 2, "log_transport10"] call _fnc_comms;
 
-    _heli engineOn true;
     private _originalCrew = _heli getVariable ["AAS_Original_Crew", []];
 
     private _evictTime = serverTime + 60;
@@ -442,8 +642,15 @@ _wpLand setWaypointStatements ["true", "(vehicle this) land 'GET IN';"];
         (count _currentPassengers == 0) || (serverTime > _evictTime)
     };
 
-    // >>>> DEACTIVATE ENGINE CLAMP <<<<
-    [_heli, false] call _fnc_toggleClamp;
+    // --- PHASE 5: CLEANUP & DESPAWN ---
+    // Compute despawn target BEFORE phase transition so watchdog has correct target.
+    private _despawnPos = _currentDest getPos [3000, random 360];
+
+    // >>>> WATCHDOG: DESPAWN PHASE <<<<
+    // Engine released, ceiling loosened to 300m for climb-out.
+    _heli setVariable ["AAS_WD_Phase", "despawn", true];
+    _heli setVariable ["AAS_WD_Target", _despawnPos, true];
+    _heli setVariable ["AAS_WD_EngineDesired", true, true];
 
     { 
         if (!(_x in _originalCrew)) then { 
@@ -452,11 +659,9 @@ _wpLand setWaypointStatements ["true", "(vehicle this) land 'GET IN';"];
         }; 
     } forEach crew _heli;
 
-    // --- PHASE 5: CLEANUP & DESPAWN ---
     deleteVehicle _helipad;
     deleteVehicle (_heli getVariable ["AAS_Active_Pad", objNull]);
 
-    private _despawnPos = _currentDest getPos [3000, random 360];
     private _wpLeave = _heliGroup addWaypoint [_despawnPos, 0];
     _wpLeave setWaypointType "MOVE";
     _wpLeave setWaypointSpeed "FULL";
