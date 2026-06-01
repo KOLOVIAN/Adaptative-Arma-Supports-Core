@@ -735,8 +735,8 @@ switch (_strikeType) do {
                     _bombsDropped = true;
                     
                     // Fork a separate thread to drop the bombs so we don't stutter the plane's movement
-                    [_plane, _pos] spawn {
-                        params ["_plane", "_pos"];
+                    [_plane, _pos, _caller] spawn {
+                        params ["_plane", "_pos", "_caller"];
                         
                         // Drop 8x Mk82 500lb Bombs
                         for "_i" from 1 to 8 do {
@@ -747,6 +747,7 @@ switch (_strikeType) do {
                             
                             // Spawn the bomb physically beneath the specific wing
                             private _bomb = createVehicle ["Bo_Mk82", _plane modelToWorld [_wingOffset, 0, -3], [], 0, "FLY"];
+                            _bomb setShotParents [_caller, _caller];
                             
                             // Align the bomb with the plane and give it the plane's exact forward momentum
                             _bomb setVectorDirAndUp [vectorDir _plane, vectorUp _plane];
@@ -858,6 +859,7 @@ switch (_strikeType) do {
             // Vanilla NATO Cruise Missile Classname (No parser needed)
             private _missileClass = "ammo_Missile_Cruise_01";
             private _missile = createVehicle [_missileClass, _spawnPosASL, [], 0, "FLY"];
+            _missile setShotParents [_caller, _caller];
             
             // Invulnerability so it doesn't hit a bird or clipping error and despawn early
             _missile allowDamage false;
@@ -927,8 +929,8 @@ switch (_strikeType) do {
             
             // Spawn the manual detonations (Guaranteed Explosion)
             createVehicle ["HelicopterExploBig", _boomPos, [], 0, "CAN_COLLIDE"];
-            private _b1 = createVehicle ["Bo_GBU12_LGB", _boomPos, [], 0, "CAN_COLLIDE"]; _b1 setDamage 1;
-            private _b2 = createVehicle ["Bo_Mk82", _boomPos getPos [3, random 360], [], 0, "CAN_COLLIDE"]; _b2 setDamage 1;
+            private _b1 = createVehicle ["Bo_GBU12_LGB", _boomPos, [], 0, "CAN_COLLIDE"]; _b1 setShotParents [_caller, _caller]; _b1 setDamage 1;
+            private _b2 = createVehicle ["Bo_Mk82", _boomPos getPos [3, random 360], [], 0, "CAN_COLLIDE"]; _b2 setShotParents [_caller, _caller]; _b2 setDamage 1;
 
             // Guaranteed Kill-Zone (20 meters)
             private _killZone = nearestObjects [_impactPos, ["AllVehicles", "House", "Strategic"], 20];
@@ -1085,13 +1087,14 @@ switch (_strikeType) do {
                 if (!_bombDropped && {(_plane distance2D _targetPosATL) < 2500}) then {
                     _bombDropped = true;
                     
-                    [_plane, _targetPosATL, _targetPosASL, _dir] spawn {
-                        params ["_plane", "_targetPosATL", "_targetPosASL", "_dir"];
+                    [_plane, _targetPosATL, _targetPosASL, _dir, _caller] spawn {
+                        params ["_plane", "_targetPosATL", "_targetPosASL", "_dir", "_caller"];
                         
                         if (!alive _plane) exitWith {}; // Failsafe if plane vanished
                         
                         // Spawn the bomb safely beneath the stealth fighter
                         private _bomb = createVehicle ["Bo_GBU12_LGB", _plane modelToWorld [0,0,-8], [], 0, "FLY"];
+                        _bomb setShotParents [_caller, _caller];
                         _bomb setDir _dir;
                         
                         // Inherit the jet's momentum
@@ -1131,20 +1134,20 @@ switch (_strikeType) do {
                         
                         // Massive Hollywood fireball + Native Fragmentation for Infantry
                         createVehicle ["HelicopterExploBig", _boomPos, [], 0, "CAN_COLLIDE"];
-                        private _b1 = createVehicle ["Bo_GBU12_LGB", _boomPos, [], 0, "CAN_COLLIDE"]; _b1 setDamage 1;
+                        private _b1 = createVehicle ["Bo_GBU12_LGB", _boomPos, [], 0, "CAN_COLLIDE"]; _b1 setShotParents [_caller, _caller]; _b1 setDamage 1;
                         
                         sleep 0.05;
                         
                         createVehicle ["HelicopterExploBig", _boomPos getPos [4, random 360], [], 0, "CAN_COLLIDE"];
-                        private _b2 = createVehicle ["Bo_GBU12_LGB", _boomPos getPos [3, random 360], [], 0, "CAN_COLLIDE"]; _b2 setDamage 1;
-                        private _b3 = createVehicle ["Bo_Mk82", _boomPos getPos [3, random 360], [], 0, "CAN_COLLIDE"]; _b3 setDamage 1;
+                        private _b2 = createVehicle ["Bo_GBU12_LGB", _boomPos getPos [3, random 360], [], 0, "CAN_COLLIDE"]; _b2 setShotParents [_caller, _caller]; _b2 setDamage 1;
+                        private _b3 = createVehicle ["Bo_Mk82", _boomPos getPos [3, random 360], [], 0, "CAN_COLLIDE"]; _b3 setShotParents [_caller, _caller]; _b3 setDamage 1;
                         // Adding raw fragmentation strictly for infantry lethality in the blast center
-                        createVehicle ["R_80mm_HE", _boomPos getPos [2, random 360], [], 0, "CAN_COLLIDE"] setDamage 1;
-                        createVehicle ["R_80mm_HE", _boomPos getPos [4, random 360], [], 0, "CAN_COLLIDE"] setDamage 1;
+                        private _frag1 = createVehicle ["R_80mm_HE", _boomPos getPos [2, random 360], [], 0, "CAN_COLLIDE"]; _frag1 setShotParents [_caller, _caller]; _frag1 setDamage 1;
+                        private _frag2 = createVehicle ["R_80mm_HE", _boomPos getPos [4, random 360], [], 0, "CAN_COLLIDE"]; _frag2 setShotParents [_caller, _caller]; _frag2 setDamage 1;
 
                         // Artillery shells throw huge, lingering dust and smoke columns into the air
-                        createVehicle ["Sh_155mm_AMOS", _boomPos getPos [5, random 360], [], 0, "CAN_COLLIDE"] setDamage 1;
-                        createVehicle ["Sh_155mm_AMOS", _boomPos getPos [5, random 360], [], 0, "CAN_COLLIDE"] setDamage 1;
+                        private _dust1 = createVehicle ["Sh_155mm_AMOS", _boomPos getPos [5, random 360], [], 0, "CAN_COLLIDE"]; _dust1 setShotParents [_caller, _caller]; _dust1 setDamage 1;
+                        private _dust2 = createVehicle ["Sh_155mm_AMOS", _boomPos getPos [5, random 360], [], 0, "CAN_COLLIDE"]; _dust2 setShotParents [_caller, _caller]; _dust2 setDamage 1;
 
                         // 2. THE DELETE BUTTON (Guaranteed Kill-Zone expanded to 40m)
                         // "AllVehicles" includes infantry ("Man") and heavy armor.

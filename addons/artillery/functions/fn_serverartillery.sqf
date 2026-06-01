@@ -159,6 +159,7 @@ switch (_strikeType) do {
                 private _spawnPos = [_impactPos select 0, _impactPos select 1, (_dropPos select 2) + 350];
                 
                 private _shell = createVehicle ["Sh_82mm_AMOS", _spawnPos, [], 0, "FLY"];
+                _shell setShotParents [_caller, _caller];
                 _shell setVelocity [0, 0, -50]; 
                 
                 sleep (_delays select _i);
@@ -217,6 +218,7 @@ switch (_strikeType) do {
                 private _spawnPos = [_impactPos select 0, _impactPos select 1, (_dropPos select 2) + 350];
                 
                 private _shell = createVehicle ["Sh_82mm_AMOS", _spawnPos, [], 0, "FLY"];
+                _shell setShotParents [_caller, _caller];
                 _shell setVelocity [0, 0, -50]; 
                 sleep (_delays select _i);
             };
@@ -274,6 +276,7 @@ switch (_strikeType) do {
                 private _spawnPos = [_impactPos select 0, _impactPos select 1, (_dropPos select 2) + 350];
                 
                 private _shell = createVehicle ["Smoke_82mm_AMOS_White", _spawnPos, [], 0, "FLY"];
+                _shell setShotParents [_caller, _caller];
                 _shell setVelocity [0, 0, -50]; 
                 sleep (_delays select _i);
             };
@@ -333,6 +336,7 @@ switch (_strikeType) do {
                 private _spawnPos = [_impactPos select 0, _impactPos select 1, (_dropPos select 2) + 400];
                 
                 private _shell = createVehicle ["Sh_155mm_AMOS", _spawnPos, [], 0, "FLY"];
+                _shell setShotParents [_caller, _caller];
                 _shell setVelocity [0, 0, -80]; 
                 sleep (_delays select _i);
             };
@@ -391,6 +395,7 @@ switch (_strikeType) do {
                 private _spawnPos = [_impactPos select 0, _impactPos select 1, (_dropPos select 2) + 400];
                 
                 private _shell = createVehicle ["Sh_155mm_AMOS", _spawnPos, [], 0, "FLY"];
+                _shell setShotParents [_caller, _caller];
                 _shell setVelocity [0, 0, -80]; 
                 
                 sleep (_delays select _i);
@@ -458,8 +463,8 @@ switch (_strikeType) do {
                 // 3. BOMBLET SATURATION (HIGHLY COMPRESSED)
                 // 2 batches of 30 for 60 bomblets per shell
                 for "_batch" from 1 to 2 do {
-                    [_impactPos] spawn {
-                        params ["_center"];
+                    [_impactPos, _caller] spawn {
+                        params ["_center", "_caller"];
                         
                         for "_b" from 1 to 30 do {
                             // 1. The Main Explosive Bomblet (40mm HE)
@@ -468,6 +473,7 @@ switch (_strikeType) do {
                             // Tighter vertical grouping (70m to 90m) so they impact closer together in time
                             _bPos set [2, 70 + random 20]; 
                             private _bomb = createVehicle ["G_40mm_HE", _bPos, [], 0, "CAN_COLLIDE"];
+                            _bomb setShotParents [_caller, _caller];
                             
                             // Faster downward velocity
                             _bomb setVelocity [0, 0, -50 - random 10]; 
@@ -476,6 +482,7 @@ switch (_strikeType) do {
                             private _dirtPos = _center getPos [random 45, random 360];
                             _dirtPos set [2, 2];
                             private _bullet = createVehicle ["B_127x99_Ball", _dirtPos, [], 0, "CAN_COLLIDE"];
+                            _bullet setShotParents [_caller, _caller];
                             _bullet setVelocity [0, 0, -300]; 
                             
                             // Extremely tight delay (0 to 20ms) for an aggressive, overlapping ripping sound
@@ -548,6 +555,7 @@ switch (_strikeType) do {
                 // Visual drop (Bullet slammed into the dirt 2 meters away so it doesn't accidentally hit the mine)
                 private _dirtPos = [_mPos select 0, (_mPos select 1) + 2, 50];
                 private _bullet = createVehicle ["B_127x99_Ball", _dirtPos, [], 0, "CAN_COLLIDE"];
+                _bullet setShotParents [_caller, _caller];
                 _bullet setVelocity [0, 0, -300]; 
                 
                 sleep (random 0.05); 
@@ -663,6 +671,7 @@ switch (_strikeType) do {
                 
                 private _dirtPos = [_mPos select 0, (_mPos select 1) + 2, 50];
                 private _bullet = createVehicle ["B_127x99_Ball", _dirtPos, [], 0, "CAN_COLLIDE"];
+                _bullet setShotParents [_caller, _caller];
                 _bullet setVelocity [0, 0, -300]; 
                 
                 sleep (random 0.05); 
@@ -752,6 +761,7 @@ switch (_strikeType) do {
                     
                     // Vanilla MLRS Rocket with standard smoke trail
                     private _rocket = createVehicle ["R_230mm_HE", _startPos, [], 0, "FLY"];
+                    _rocket setShotParents [_caller, _caller];
                     _rocket setPosASL _startASL;
                     _rocket allowDamage false; 
                     
@@ -790,6 +800,7 @@ switch (_strikeType) do {
                         _boomPos set [2, 0.5];
                         
                         private _he = createVehicle ["R_230mm_HE", _boomPos, [], 0, "CAN_COLLIDE"];
+                        _he setShotParents [_caller, _caller];
                         _he setDamage 1;
                     };
                 };
@@ -843,6 +854,7 @@ switch (_strikeType) do {
                     private _startASL = AGLToASL _startPos;
                     
                     private _rocket = createVehicle ["R_230mm_HE", _startPos, [], 0, "FLY"];
+                    _rocket setShotParents [_caller, _caller];
                     _rocket setPosASL _startASL;
                     _rocket allowDamage false; 
                     
@@ -878,6 +890,7 @@ switch (_strikeType) do {
                         _boomPos set [2, 0.5];
 
                         private _he = createVehicle ["R_230mm_HE", _boomPos, [], 0, "CAN_COLLIDE"];
+                        _he setShotParents [_caller, _caller];
                         _he setDamage 1;
                     };
                 };
@@ -935,6 +948,7 @@ switch (_strikeType) do {
                     params ["_startPos", "_targetPos", "_caller", "_isMainRocket"];
 
                     private _rocket = createVehicle ["R_230mm_HE", _startPos, [], 0, "FLY"];
+                    _rocket setShotParents [_caller, _caller];
                     _rocket setPosASL (AGLToASL _startPos);
                     
                     private _targetASL = AGLToASL _targetPos;

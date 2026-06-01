@@ -156,10 +156,6 @@ private _themeNames = [];
 [ "AAS_Cooldown_Reinf_Armor", "EDITBOX", ["Armor Cooldown (Sec)", "Cooldown for Armor supports."], ["AAS - Reinforcements", "3. Armor"], "1200", 1 ] call CBA_fnc_addSetting;
 [ "AAS_RTB_Reinf_Armor", "EDITBOX", ["Armor RTB (Sec)", "Extraction time for Armor supports."], ["AAS - Reinforcements", "3. Armor"], "600", 1 ] call CBA_fnc_addSetting;
 
-private _registry = profileNamespace getVariable ["AAS_Template_Registry", []];
-private _names    = ["— Default —"] + (_registry apply { _x select 0 });
-private _indices  = [-1]            + (_registry apply { _forEachIndex });
-
 
 // ==========================================
 // --- FACTION TEMPLATES ---
@@ -319,13 +315,13 @@ AAS_VanillaDefaults = [
 AAS_Template_Registry_Cache = profileNamespace getVariable ["AAS_Template_Registry", []];
 
 private _registry = AAS_Template_Registry_Cache;
-private _names    = ["— Default (Vanilla NATO) —"] + (_registry apply { _x select 0 });
-private _values   = ["__default__"]               + (_registry apply { _x select 0 });
+private _names    = ["— Custom (Keep current settings) —", "— Default (Vanilla NATO) —"] + (_registry apply { _x select 0 });
+private _values   = ["__custom__", "__default__"]                                         + (_registry apply { _x select 0 });
 
 AAS_Template_UI_Ready = false;
 
 ["AAS_Selected_Template", "LIST",
-    ["Faction Template", "Select an installed faction template. Place an [AAS FACTION] composition via Zeus to install one permanently."],
+    ["Faction Template", "Select an installed faction template. 'Custom' preserves your manually-set CBA values. 'Default' resets to Vanilla NATO. Place an [AAS FACTION] composition via Zeus to install custom templates."],
     ["AAS - CORE SETTINGS", "3. Faction Templates"],
     [_values, _names, 0],
     false,
@@ -333,24 +329,30 @@ AAS_Template_UI_Ready = false;
         params ["_val"];
         if (!AAS_Template_UI_Ready) exitWith {};
 
-        if (_val == "__default__") then {
+        if (_val == "__custom__") exitWith {
+            profileNamespace setVariable ["AAS_ActiveTemplate", []];
+            saveProfileNamespace;
+            "[AAS] Custom mode — your manual CBA settings are preserved." remoteExec ["systemChat", 0];
+        };
+
+        if (_val == "__default__") exitWith {
             { [_x select 0, _x select 1, 2, "server"] call CBA_settings_fnc_set; } forEach AAS_VanillaDefaults;
             profileNamespace setVariable ["AAS_ActiveTemplate", []];
             saveProfileNamespace;
             "[AAS] Reset to Vanilla NATO defaults." remoteExec ["systemChat", 0];
-        } else {
-            private _idx = AAS_Template_Registry_Cache findIf { (_x select 0) == _val };
-
-            if (_idx < 0) exitWith {
-                "[AAS] Template not found — reinstall the composition." remoteExec ["systemChat", 0];
-            };
-
-            private _t = (AAS_Template_Registry_Cache select _idx) select 1;
-            { [_x select 0, _x select 1, 2, "server"] call CBA_settings_fnc_set; } forEach _t;
-            profileNamespace setVariable ["AAS_ActiveTemplate", _t];
-            saveProfileNamespace;
-            (format ["[AAS] '%1' faction template applied.", _val]) remoteExec ["systemChat", 0];
         };
+
+        private _idx = AAS_Template_Registry_Cache findIf { (_x select 0) == _val };
+
+        if (_idx < 0) exitWith {
+            "[AAS] Template not found — reinstall the composition." remoteExec ["systemChat", 0];
+        };
+
+        private _t = (AAS_Template_Registry_Cache select _idx) select 1;
+        { [_x select 0, _x select 1, 2, "server"] call CBA_settings_fnc_set; } forEach _t;
+        profileNamespace setVariable ["AAS_ActiveTemplate", _t];
+        saveProfileNamespace;
+        (format ["[AAS] '%1' faction template applied.", _val]) remoteExec ["systemChat", 0];
     }
 ] call CBA_fnc_addSetting;
 
