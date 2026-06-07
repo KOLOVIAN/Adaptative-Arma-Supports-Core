@@ -104,11 +104,11 @@ private _fnc_parseClass = {
 switch (_casType) do {
 
     // ---------------------------------------------------------------------
-    // CASE A: PLANE (CLEAN VANILLA SLATE)
+    // CASE A: PLANE (DUAL-CONE 3D ALIGNMENT & PHANTOM RESTORED)
     // ---------------------------------------------------------------------
     case "PLANE": {
         private _airClassRaw = AAS_CAS_Plane_Class;
-        private _behaviorMode = AAS_CAS_Plane_Behavior; // Kept variable to avoid breaking dependencies
+        private _behaviorMode = AAS_CAS_Plane_Behavior; 
         private _flightHeight = 400; // Planes need a safe baseline
         private _loiterRadius = 1500;
 
@@ -125,7 +125,7 @@ switch (_casType) do {
         private _airGroup = _airData select 2;
 
         // Apply specific Plane logic (Anti-Stall Push)
-        _aircraft setVelocityModelSpace [0, 150, 0]; // ~540 km/h push
+        _aircraft setVelocityModelSpace [0, 150, 0]; 
 
         // Apply Loadouts & Protection
         if (_customLoadout isNotEqualTo false) then {
@@ -135,15 +135,80 @@ switch (_casType) do {
         _aircraft allowDamage false; 
         _aircraft flyInHeight _flightHeight;
 
-        // Infinite Ammo Tracker
+        // =================================================================
+        // --- 1. DYNAMIC WEAPON CLASSIFICATION ---
+        // =================================================================
+        private _cannonWep = "";
+        private _missileWeps = [];
+        
+        {
+            private _wName = toLower _x;
+            if (!("laser" in _wName) && !("flare" in _wName) && !("smoke" in _wName) && !("horn" in _wName)) then {
+                private _ammoCount = _aircraft ammo _x;
+                // Treat weapons with massive ammo pools as the primary cannon
+                if (_ammoCount > 300) then {
+                    if (_cannonWep == "") then { _cannonWep = _x; };
+                } else {
+                    // Collect ALL other valid weapons as missiles/rockets
+                    _missileWeps pushBack _x; 
+                };
+            };
+        } forEach (weapons _aircraft);
+
+        _aircraft setVariable ["AAS_Plane_Cannon", _cannonWep];
+        _aircraft setVariable ["AAS_Plane_Missiles", _missileWeps];
         _aircraft setVariable ["AAS_LastFireTime", serverTime];
+
+        // =================================================================
+        // --- 2. ACTIVE HOMING & PERIODIC AMMO REPLENISHMENT ---
+        // =================================================================
+        
+        // 20-Second Ammo Replenish Thread
+        [_aircraft] spawn {
+            params ["_aircraft"];
+            while {alive _aircraft} do {
+                sleep 20;
+                _aircraft setVehicleAmmo 1;
+            };
+        };
+
+        // Fired Event Handler (Time Tracking & Missile Guidance ONLY)
         _aircraft addEventHandler ["Fired", {
-            params ["_unit"];
-            _unit setVehicleAmmo 1;
+            params ["_unit", "_weapon", "_muzzle", "_mode", "_ammo", "_magazine", "_projectile", "_gunner"];
+            
             _unit setVariable ["AAS_LastFireTime", serverTime];
+
+            private _missiles = _unit getVariable ["AAS_Plane_Missiles", []];
+            private _target = _unit getVariable ["AAS_Plane_Target", objNull];
+
+            // If it's any missile/rocket, forcefully guide it to the target
+            if (_weapon in _missiles && !isNull _target && {alive _target}) then {
+                [_projectile, _target] spawn {
+                    params ["_proj", "_tgt"];
+                    sleep 0.1; // Let it clear the wings
+                    
+                    // Native lock if engine allows
+                    _proj setMissileTarget _tgt;
+                    
+                    // Physical vector steering loop (Mod Agnostic)
+                    while {alive _proj && alive _tgt} do {
+                        private _posP = getPosASL _proj;
+                        private _posT = getPosASL _tgt;
+                        _posT set [2, (_posT select 2) + 1]; // Aim for center of mass
+                        
+                        private _dir = vectorNormalized (_posT vectorDiff _posP);
+                        private _speed = vectorMagnitude (velocity _proj);
+                        
+                        _proj setVectorDir _dir;
+                        _proj setVelocity (_dir vectorMultiply (_speed max 150));
+                        
+                        sleep 0.05;
+                    };
+                };
+            };
         }];
 
-        // Crew setup - FIXED SHADOWING
+        // Crew setup
         { 
             private _unit = _x;
             _unit allowDamage false; 
@@ -152,14 +217,150 @@ switch (_casType) do {
             { _unit setSkill [_x, 1]; } forEach ["aimingAccuracy", "aimingShake", "aimingSpeed", "spotDistance", "spotTime", "commanding", "courage", "reloadSpeed"];
         } forEach crew _aircraft;
 
-        // Waypoints & Behavior - STRIPPED TO BARE VANILLA
+        // Waypoints & Behavior
         private _wpAttack = _airGroup addWaypoint [_dropPos, 0];
         _wpAttack setWaypointType "SAD";
         _wpAttack setWaypointSpeed "NORMAL";
         _airGroup setCombatMode "RED"; 
-        _airGroup setBehaviour "AWARE"; // Crucial fix: "AWARE" prevents pilot evasive panic
+        _airGroup setBehaviour "AWARE"; 
 
-        // RTB Thread
+        // =================================================================
+        // --- 3. RADAR & PHANTOM FALLBACK THREAD (5s TICK) ---
+        // =================================================================
+        [_aircraft, _airGroup, _dropPos] spawn {
+            params ["_aircraft", "_airGroup", "_dropPos"];
+            private _scanRadius = 800;
+            private _friendlySide = side _airGroup;
+            private _phantoms = [];
+            private _noVehTime = 0; // Tracks consecutive seconds without vehicles
+
+            while {alive _aircraft} do {
+                sleep 5;
+                if (behaviour driver _aircraft == "CARELESS") exitWith {};
+
+                private _pilot = driver _aircraft;
+                private _lastFireTime = _aircraft getVariable ["AAS_LastFireTime", serverTime];
+                private _timeSinceFire = serverTime - _lastFireTime;
+                
+                private _vehicles = (_dropPos nearEntities [["LandVehicle", "Ship"], _scanRadius]) select {
+                    alive _x && { _friendlySide getFriend (side _x) < 0.6 }
+                };
+
+                private _target = objNull;
+                private _useFallback = false;
+
+                if (count _vehicles > 0) then {
+                    _noVehTime = 0; 
+                    _target = _vehicles select 0;
+                    { if (_x distance2D _dropPos < _target distance2D _dropPos) then { _target = _x; }; } forEach _vehicles;
+                } else {
+                    _noVehTime = _noVehTime + 5;
+                };
+
+                // Triggers: No vehicles for 30s OR no firing for 60s
+                if (_noVehTime >= 30 || _timeSinceFire >= 60) then { _useFallback = true; };
+
+                if (_useFallback && isNull _target) then {
+                    private _infantry = (_dropPos nearEntities [["Man"], _scanRadius]) select {
+                        alive _x && { _friendlySide getFriend (side _x) < 0.6 }
+                    };
+
+                    if (count _infantry > 0) then {
+                        private _infTarget = _infantry select 0;
+                        { if (_x distance2D _dropPos < _infTarget distance2D _dropPos) then { _infTarget = _x; }; } forEach _infantry;
+
+                        // Create or Move the buried Ifrit
+                        private _phantomPosASL = (getPosASL _infTarget) vectorAdd [0, 0, -1.8];
+                        if (count _phantoms == 0 || {isNull (_phantoms select 0)}) then {
+                            private _p = createVehicle ["O_MRAP_02_F", _infTarget, [], 0, "CAN_COLLIDE"];
+                            _p allowDamage false; _p engineOn false; _p hideObjectGlobal true;
+                            _p setPosASL _phantomPosASL;
+                            [_p] joinSilent (group _infTarget); createVehicleCrew _p;
+                            { _x allowDamage false; _x hideObjectGlobal true; } forEach crew _p;
+                            _phantoms set [0, _p];
+                        } else {
+                            (_phantoms select 0) setPosASL _phantomPosASL;
+                        };
+                        _target = _phantoms select 0; 
+                    } else {
+                        { if (!isNull _x) then { { deleteVehicle _x } forEach crew _x; deleteVehicle _x; }; } forEach _phantoms;
+                        _phantoms = [];
+                    };
+                };
+
+                _aircraft setVariable ["AAS_Plane_Target", _target];
+
+                if (!isNull _target) then {
+                    _airGroup reveal [_target, 4];
+                    _pilot doTarget _target;
+                };
+            };
+
+            { if (!isNull _x) then { { deleteVehicle _x } forEach crew _x; deleteVehicle _x; }; } forEach _phantoms;
+        };
+
+        // =================================================================
+        // --- 4. 3D ALIGNMENT & DUAL-TOLERANCE TRIGGER (0.1s TICK) ---
+        // =================================================================
+        [_aircraft] spawn {
+            params ["_aircraft"];
+            private _pilot = driver _aircraft;
+
+            while {alive _aircraft} do {
+                sleep 0.1;
+                if (behaviour _pilot == "CARELESS") exitWith {};
+
+                private _target = _aircraft getVariable ["AAS_Plane_Target", objNull];
+                if (!isNull _target && {alive _target}) then {
+                    private _dist = _aircraft distance _target;
+                    if (_dist < 3000 && _dist > 100) then {
+                        
+                        private _vDir = vectorDir _aircraft; 
+                        private _vToTgt = vectorNormalized ((getPosASL _target) vectorDiff (getPosASL _aircraft));
+                        private _dot = _vDir vectorDotProduct _vToTgt;
+                        
+                        // 10-DEGREE TOLERANCE: ROCKETS/MISSILES/BOMBS
+                        if (_dot >= 0.984 && !(_aircraft getVariable ["AAS_Missiles_Cooldown", false])) then {
+                            _aircraft setVariable ["AAS_Missiles_Cooldown", true];
+                            [_aircraft, _target] spawn {
+                                params ["_plane", "_tgt"];
+                                private _weps = _plane getVariable ["AAS_Plane_Missiles", []];
+                                {
+                                    if (!alive _plane || !alive _tgt) exitWith {};
+                                    // Use action to force trigger pull for bombs/missiles
+                                    _plane action ["UseWeapon", _plane, driver _plane, _plane currentWeaponTurret [0]];
+                                    sleep 0.5;
+                                } forEach _weps;
+                                sleep 5; 
+                                _plane setVariable ["AAS_Missiles_Cooldown", false];
+                            };
+                        };
+
+                        // 5-DEGREE TOLERANCE: CANNON
+                        if (_dot >= 0.996 && !(_aircraft getVariable ["AAS_Cannon_Cooldown", false])) then {
+                            _aircraft setVariable ["AAS_Cannon_Cooldown", true];
+                            [_aircraft] spawn {
+                                params ["_plane"];
+                                private _cannon = _plane getVariable ["AAS_Plane_Cannon", ""];
+                                if (_cannon != "") then {
+                                    // Forced trigger pull for cannon
+                                    for "_i" from 1 to 20 do {
+                                        _plane forceWeaponFire [_cannon, "FullAuto"];
+                                        sleep 0.1;
+                                    };
+                                };
+                                sleep 5;
+                                _plane setVariable ["AAS_Cannon_Cooldown", false];
+                            };
+                        };
+                    };
+                };
+            };
+        };
+
+        // =================================================================
+        // --- 5. RTB THREAD ---
+        // =================================================================
         [_aircraft, _airGroup, _spawnPos, _rtbTime] spawn {
             params ["_aircraft", "_airGroup", "_spawnPos", "_rtbTime"];
             sleep 120;
@@ -260,7 +461,7 @@ switch (_casType) do {
     };
 
     // ---------------------------------------------------------------------
-    // CASE C: GUNSHIP (UNCHANGED)
+    // CASE C: GUNSHIP (UNCHANGED EXCEPT PHANTOM Z-OFFSET SCRIPT)
     // ---------------------------------------------------------------------
     case "GUNSHIP": {
         private _airClassRaw = AAS_CAS_Gunship_Class;
@@ -339,18 +540,35 @@ switch (_casType) do {
                     {
                         private _idx = _forEachIndex;
                         private _gunner = _x;
-                        private _offset = [(_idx * 15), 0, 0];
-                        private _phantomPos = (getPos _target) vectorAdd _offset;
+                        
+                        // NEW PHANTOM OFFSET LOGIC:
+                        // X offset is tiny so they stay on target. Z offset is -1.8m to bury the Ifrit.
+                        private _offset = [(_idx * 0.5), 0, -1.8];
+                        private _phantomPosASL = (getPosASL _target) vectorAdd _offset;
 
                         if (_idx >= count _phantoms || { isNull (_phantoms select _idx) }) then {
-                            private _p = createVehicle ["O_MRAP_02_F", _phantomPos, [], 0, "NONE"];
-                            _p allowDamage false; _p engineOn false; _p hideObjectGlobal true;
-                            [_p] joinSilent (group _target); createVehicleCrew _p;
-                            { _x allowDamage false; _x hideObjectGlobal true; } forEach crew _p;
+                            // CAN_COLLIDE prevents Arma from snapping the vehicle back to the surface
+                            private _p = createVehicle ["O_MRAP_02_F", _target, [], 0, "CAN_COLLIDE"];
+                            _p allowDamage false; 
+                            _p engineOn false; 
+                            _p hideObjectGlobal true;
+                            
+                            // Force absolute position underground
+                            _p setPosASL _phantomPosASL;
+                            
+                            [_p] joinSilent (group _target); 
+                            createVehicleCrew _p;
+                            { 
+                                _x allowDamage false; 
+                                _x hideObjectGlobal true; 
+                            } forEach crew _p;
+                            
                             _phantoms set [_idx, _p];
                         } else {
-                            (_phantoms select _idx) setPos _phantomPos;
+                            // Update position using ASL to keep it buried
+                            (_phantoms select _idx) setPosASL _phantomPosASL;
                         };
+                        
                         _gunner doTarget (_phantoms select _idx);
                     } forEach _gunners;
                 } else {
