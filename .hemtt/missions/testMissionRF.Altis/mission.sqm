@@ -28,7 +28,6 @@ addons[]=
 	"A3_Weapons_F",
 	"A3_Weapons_F_Pistols_P07",
 	"A3_Weapons_F_Items",
-	"A3_Armor_F_Beta_APC_Tracked_02",
 	"A3_Armor_F_Beta_APC_Wheeled_02",
 	"A3_Modules_F_Curator_Curator"
 };
@@ -94,7 +93,7 @@ class Mission
 	};
 	class Entities
 	{
-		items=10;
+		items=9;
 		class Item0
 		{
 			dataType="Group";
@@ -586,57 +585,8 @@ class Mission
 			side="East";
 			class Entities
 			{
-				items=11;
+				items=8;
 				class Item0
-				{
-					dataType="Object";
-					class PositionInfo
-					{
-						position[]={14784.123,17.851784,16341.185};
-						angles[]={6.2818484,0,0.0013372133};
-					};
-					side="East";
-					flags=4;
-					class Attributes
-					{
-					};
-					id=26;
-					type="O_crew_F";
-				};
-				class Item1
-				{
-					dataType="Object";
-					class PositionInfo
-					{
-						position[]={14784.119,20.424582,16341.181};
-						angles[]={6.2818484,0,0.0013372133};
-					};
-					side="East";
-					class Attributes
-					{
-					};
-					id=27;
-					type="O_crew_F";
-					atlOffset=2.5728073;
-				};
-				class Item2
-				{
-					dataType="Object";
-					class PositionInfo
-					{
-						position[]={14784.119,20.424582,16341.181};
-						angles[]={6.2818484,0,0.0013372133};
-					};
-					side="East";
-					flags=2;
-					class Attributes
-					{
-					};
-					id=28;
-					type="O_crew_F";
-					atlOffset=2.5728073;
-				};
-				class Item3
 				{
 					dataType="Object";
 					class PositionInfo
@@ -652,7 +602,7 @@ class Mission
 					id=29;
 					type="O_Soldier_SL_F";
 				};
-				class Item4
+				class Item1
 				{
 					dataType="Object";
 					class PositionInfo
@@ -660,7 +610,7 @@ class Mission
 						position[]={14779.123,17.851439,16336.185};
 					};
 					side="East";
-					flags=5;
+					flags=7;
 					class Attributes
 					{
 						skill=0.44999999;
@@ -669,7 +619,7 @@ class Mission
 					id=30;
 					type="O_Soldier_AR_F";
 				};
-				class Item5
+				class Item2
 				{
 					dataType="Object";
 					class PositionInfo
@@ -685,7 +635,7 @@ class Mission
 					id=31;
 					type="O_Soldier_AT_F";
 				};
-				class Item6
+				class Item3
 				{
 					dataType="Object";
 					class PositionInfo
@@ -701,7 +651,7 @@ class Mission
 					id=32;
 					type="O_Soldier_AT_F";
 				};
-				class Item7
+				class Item4
 				{
 					dataType="Object";
 					class PositionInfo
@@ -717,7 +667,7 @@ class Mission
 					id=33;
 					type="O_Soldier_AT_F";
 				};
-				class Item8
+				class Item5
 				{
 					dataType="Object";
 					class PositionInfo
@@ -734,7 +684,7 @@ class Mission
 					id=34;
 					type="O_Soldier_AAT_F";
 				};
-				class Item9
+				class Item6
 				{
 					dataType="Object";
 					class PositionInfo
@@ -750,7 +700,7 @@ class Mission
 					id=35;
 					type="O_Soldier_AAT_F";
 				};
-				class Item10
+				class Item7
 				{
 					dataType="Object";
 					class PositionInfo
@@ -770,70 +720,9 @@ class Mission
 			class Attributes
 			{
 			};
-			class CrewLinks
-			{
-				class LinkIDProvider
-				{
-					nextID=3;
-				};
-				class Links
-				{
-					items=3;
-					class Item0
-					{
-						linkID=0;
-						item0=26;
-						item1=25;
-						class CustomData
-						{
-							role=1;
-						};
-					};
-					class Item1
-					{
-						linkID=1;
-						item0=27;
-						item1=25;
-						class CustomData
-						{
-							role=2;
-							turretPath[]={0};
-						};
-					};
-					class Item2
-					{
-						linkID=2;
-						item0=28;
-						item1=25;
-						class CustomData
-						{
-							role=2;
-							turretPath[]={0,0};
-						};
-					};
-				};
-			};
 			id=24;
 		};
 		class Item6
-		{
-			dataType="Object";
-			class PositionInfo
-			{
-				position[]={14784.119,20.423143,16341.131};
-				angles[]={6.2818484,0,0.0013372133};
-			};
-			side="East";
-			flags=6;
-			class Attributes
-			{
-				skill=0.55000001;
-				rank="LIEUTENANT";
-			};
-			id=25;
-			type="O_APC_Tracked_02_cannon_F";
-		};
-		class Item7
 		{
 			dataType="Group";
 			side="East";
@@ -1041,7 +930,7 @@ class Mission
 			};
 			id=37;
 		};
-		class Item8
+		class Item7
 		{
 			dataType="Object";
 			class PositionInfo
@@ -1059,7 +948,7 @@ class Mission
 			id=38;
 			type="O_APC_Wheeled_02_rcws_v2_F";
 		};
-		class Item9
+		class Item8
 		{
 			dataType="Logic";
 			class PositionInfo

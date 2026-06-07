@@ -83,14 +83,10 @@ private _themeNames = [];
 
 // --- 1. Plane ---
 [ "AAS_CAS_Plane_Class", "EDITBOX", ["Plane Classname", "Classname for the CAS Plane."], ["AAS - Close Air Support", "1. Plane"], "B_Plane_CAS_01_dynamicLoadout_F", 1 ] call CBA_fnc_addSetting;
-[ "AAS_CAS_Plane_Behavior", "LIST", ["Plane Behavior", "Select the AI behavior pattern."], ["AAS - Close Air Support", "1. Plane"], [[0, 1], ["Loiter (Circles LZ)", "Search and Destroy (Hunts Targets)"], 1], 1 ] call CBA_fnc_addSetting;
 [ "AAS_CAS_Plane_CostMult", "EDITBOX", ["Plane Cost Multiplier", "Multiplies the base CAS cost."], ["AAS - Close Air Support", "1. Plane"], "1.5", 1 ] call CBA_fnc_addSetting;
 
 // --- 2. Helicopter ---
 [ "AAS_CAS_Heli_Class", "EDITBOX", ["Helicopter Classname", "Classname for the CAS Helicopter."], ["AAS - Close Air Support", "2. Helicopter"], "B_Heli_Attack_01_dynamicLoadout_F", 1 ] call CBA_fnc_addSetting;
-[ "AAS_CAS_Heli_Behavior", "LIST", ["Helicopter Behavior", "Select the AI behavior pattern."], ["AAS - Close Air Support", "2. Helicopter"], [[0, 1], ["Loiter (Circles LZ)", "Search and Destroy (Hunts Targets)"], 0], 1 ] call CBA_fnc_addSetting;
-[ "AAS_CAS_Heli_Height", "EDITBOX", ["Helicopter Loiter Height", "Altitude in meters."], ["AAS - Close Air Support", "2. Helicopter"], "400", 1 ] call CBA_fnc_addSetting;
-[ "AAS_CAS_Heli_Radius", "EDITBOX", ["Helicopter Loiter Radius", "Radius in meters."], ["AAS - Close Air Support", "2. Helicopter"], "600", 1 ] call CBA_fnc_addSetting;
 [ "AAS_CAS_Heli_CostMult", "EDITBOX", ["Helicopter Cost Multiplier", "Multiplies the base CAS cost."], ["AAS - Close Air Support", "2. Helicopter"], "1.0", 1 ] call CBA_fnc_addSetting;
 
 // --- 3. Gunship ---

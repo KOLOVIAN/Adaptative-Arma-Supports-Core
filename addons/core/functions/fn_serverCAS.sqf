@@ -108,7 +108,7 @@ switch (_casType) do {
     // ---------------------------------------------------------------------
     case "PLANE": {
         private _airClassRaw = AAS_CAS_Plane_Class;
-        private _behaviorMode = AAS_CAS_Plane_Behavior; 
+        private _behaviorMode = 1;
         private _flightHeight = 400; // Planes need a safe baseline
         private _loiterRadius = 1500;
 
@@ -163,11 +163,11 @@ switch (_casType) do {
         // --- 2. ACTIVE HOMING & PERIODIC AMMO REPLENISHMENT ---
         // =================================================================
         
-        // 20-Second Ammo Replenish Thread
+        // 35-Second Ammo Replenish Thread (FIXED)
         [_aircraft] spawn {
             params ["_aircraft"];
             while {alive _aircraft} do {
-                sleep 20;
+                sleep 45;
                 _aircraft setVehicleAmmo 1;
             };
         };
@@ -242,8 +242,9 @@ switch (_casType) do {
                 private _lastFireTime = _aircraft getVariable ["AAS_LastFireTime", serverTime];
                 private _timeSinceFire = serverTime - _lastFireTime;
                 
+                // EXCLUDE PHANTOMS FROM VEHICLE SCAN (FIXED)
                 private _vehicles = (_dropPos nearEntities [["LandVehicle", "Ship"], _scanRadius]) select {
-                    alive _x && { _friendlySide getFriend (side _x) < 0.6 }
+                    alive _x && { _friendlySide getFriend (side _x) < 0.6 } && { !(_x in _phantoms) }
                 };
 
                 private _target = objNull;
@@ -279,6 +280,7 @@ switch (_casType) do {
                             { _x allowDamage false; _x hideObjectGlobal true; } forEach crew _p;
                             _phantoms set [0, _p];
                         } else {
+                            // Continuously shift to the next living target!
                             (_phantoms select 0) setPosASL _phantomPosASL;
                         };
                         _target = _phantoms select 0; 
@@ -304,60 +306,95 @@ switch (_casType) do {
         // =================================================================
         [_aircraft] spawn {
             params ["_aircraft"];
-            private _pilot = driver _aircraft;
+
+            // Helper function to dynamically find the correct fire mode for ANY weapon
+            private _fnc_getFireMode = {
+                params ["_weaponClass"];
+                private _modes = getArray (configFile >> "CfgWeapons" >> _weaponClass >> "modes");
+                private _mode = _weaponClass; // Default to classname
+                if (count _modes > 0) then {
+                    _mode = _modes select 0;
+                    if (_mode == "this") then { _mode = _weaponClass; };
+                };
+                _mode
+            };
 
             while {alive _aircraft} do {
                 sleep 0.1;
-                if (behaviour _pilot == "CARELESS") exitWith {};
+                if (behaviour driver _aircraft == "CARELESS") exitWith {};
 
                 private _target = _aircraft getVariable ["AAS_Plane_Target", objNull];
+                
                 if (!isNull _target && {alive _target}) then {
                     private _dist = _aircraft distance _target;
+                    
+                    // Engagement Window: Under 3000m, above 100m
                     if (_dist < 3000 && _dist > 100) then {
                         
+                        // 3D Alignment Math
                         private _vDir = vectorDir _aircraft; 
                         private _vToTgt = vectorNormalized ((getPosASL _target) vectorDiff (getPosASL _aircraft));
                         private _dot = _vDir vectorDotProduct _vToTgt;
                         
-                        // 10-DEGREE TOLERANCE: ROCKETS/MISSILES/BOMBS
+                        // -----------------------------------------------------
+                        // 10-DEGREE CONE (BOMBS, MISSILES, ROCKETS) -> Cos(10) = ~0.984
+                        // -----------------------------------------------------
                         if (_dot >= 0.984 && !(_aircraft getVariable ["AAS_Missiles_Cooldown", false])) then {
                             _aircraft setVariable ["AAS_Missiles_Cooldown", true];
-                            [_aircraft, _target] spawn {
-                                params ["_plane", "_tgt"];
+                            
+                            [_aircraft, _target, _fnc_getFireMode] spawn {
+                                params ["_plane", "_tgt", "_fnc_getFireMode"];
                                 private _weps = _plane getVariable ["AAS_Plane_Missiles", []];
+                                
                                 {
-                                    if (!alive _plane || !alive _tgt) exitWith {};
-                                    // Use action to force trigger pull for bombs/missiles
-                                    _plane action ["UseWeapon", _plane, driver _plane, _plane currentWeaponTurret [0]];
-                                    sleep 0.5;
+                                    private _weap = _x;
+                                    private _mode = [_weap] call _fnc_getFireMode;
+
+                                    // Fire 2 times instead of 4 (FIXED)
+                                    for "_j" from 1 to 1 do {
+                                        if (!alive _plane || !alive _tgt) exitWith {};
+                                        // Tell the AI to focus, then physically force the trigger
+                                        _plane fireAtTarget [_tgt, _weap];
+                                        _plane forceWeaponFire [_weap, _mode];
+                                        sleep 0.3; // Slight delay for cinematic ripple
+                                    };
                                 } forEach _weps;
-                                sleep 5; 
-                                _plane setVariable ["AAS_Missiles_Cooldown", false];
+
+                                sleep 10; // 10 Second Cooldown before next missile/bomb barrage
+                                if (alive _plane) then { _plane setVariable ["AAS_Missiles_Cooldown", false]; };
                             };
                         };
 
-                        // 5-DEGREE TOLERANCE: CANNON
+                        // -----------------------------------------------------
+                        // 5-DEGREE CONE (CANNON BURST) -> Cos(5) = ~0.996
+                        // -----------------------------------------------------
                         if (_dot >= 0.996 && !(_aircraft getVariable ["AAS_Cannon_Cooldown", false])) then {
                             _aircraft setVariable ["AAS_Cannon_Cooldown", true];
-                            [_aircraft] spawn {
-                                params ["_plane"];
+                            
+                            [_aircraft, _target, _fnc_getFireMode] spawn {
+                                params ["_plane", "_tgt", "_fnc_getFireMode"];
                                 private _cannon = _plane getVariable ["AAS_Plane_Cannon", ""];
+                                
                                 if (_cannon != "") then {
-                                    // Forced trigger pull for cannon
+                                    private _mode = [_cannon] call _fnc_getFireMode;
+
                                     for "_i" from 1 to 20 do {
-                                        _plane forceWeaponFire [_cannon, "FullAuto"];
-                                        sleep 0.1;
+                                        if (!alive _plane || !alive _tgt) exitWith {};
+                                        _plane fireAtTarget [_tgt, _cannon];
+                                        _plane forceWeaponFire [_cannon, _mode];
+                                        sleep 0.1; // Continuous burst
                                     };
                                 };
-                                sleep 5;
-                                _plane setVariable ["AAS_Cannon_Cooldown", false];
+
+                                sleep 8; // 8 Second Cooldown before next cannon burst
+                                if (alive _plane) then { _plane setVariable ["AAS_Cannon_Cooldown", false]; };
                             };
                         };
+
                     };
                 };
             };
         };
-
         // =================================================================
         // --- 5. RTB THREAD ---
         // =================================================================
@@ -378,87 +415,111 @@ switch (_casType) do {
     };
 
     // ---------------------------------------------------------------------
-    // CASE B: HELICOPTER (CLEAN VANILLA SLATE)
+    // CASE B: HELICOPTER (QRF-STYLE WAYPOINT REFRESH)
     // ---------------------------------------------------------------------
     case "HELI": {
-        private _airClassRaw = AAS_CAS_Heli_Class;
-        private _behaviorMode = AAS_CAS_Heli_Behavior; // Kept variable
-        private _flightHeight = parseNumber AAS_CAS_Heli_Height;
-        private _loiterRadius = parseNumber AAS_CAS_Heli_Radius;
+    private _airClassRaw = AAS_CAS_Heli_Class;
+    private _airParsed = [_airClassRaw] call _fnc_parseClass;
+    private _airClass = _airParsed select 0;
+    
+    private _spawnPos = _dropPos getPos [_spawnDist, random 360];
+    _spawnPos set [2, 400];
+    
+    private _airData = [_spawnPos, _spawnPos getDir _dropPos, _airClass, _playerSide] call BIS_fnc_spawnVehicle;
+    private _aircraft = _airData select 0;
+    private _airGroup = _airData select 2;
+    _aircraft allowDamage false;
+    { _x allowDamage false; } forEach crew _aircraft;
 
-        // Parse Air Class
-        private _airParsed = [_airClassRaw] call _fnc_parseClass;
-        private _airClass = _airParsed select 0;
-        private _customLoadout = _airParsed select 1;
-
-        // Spawning
-        private _spawnPos = _dropPos getPos [_spawnDist, random 360];
-        _spawnPos set [2, _flightHeight]; 
-        private _airData = [_spawnPos, _spawnPos getDir _dropPos, _airClass, _playerSide] call BIS_fnc_spawnVehicle;
-        private _aircraft = _airData select 0;
-        private _airGroup = _airData select 2;
-
-        // Apply Loadouts & Protection
-        if (_customLoadout isNotEqualTo false) then {
-            if (_customLoadout isEqualType []) then { _aircraft setUnitLoadout _customLoadout; };
-            if (_customLoadout isEqualType "") then { _aircraft call compile _customLoadout; };
-        };
-        _aircraft allowDamage false; 
-        _aircraft flyInHeight _flightHeight;
-
-        // Infinite Ammo Tracker
-        _aircraft setVariable ["AAS_LastFireTime", serverTime];
-        _aircraft addEventHandler ["Fired", {
-            params ["_unit"];
-            _unit setVehicleAmmo 1;
-            _unit setVariable ["AAS_LastFireTime", serverTime];
-        }];
-
-        // Crew setup - FIXED SHADOWING
-        { 
-            private _unit = _x;
-            _unit allowDamage false; 
-            _unit addRating 100000; 
-            [_unit] joinSilent _airGroup;
-            { _unit setSkill [_x, 1]; } forEach ["aimingAccuracy", "aimingShake", "aimingSpeed", "spotDistance", "spotTime", "commanding", "courage", "reloadSpeed"];
-        } forEach crew _aircraft;
-
-        // Waypoints & Behavior - STRIPPED TO BARE VANILLA
-        private _wpAttack = _airGroup addWaypoint [_dropPos, 0];
-        _wpAttack setWaypointType "SAD";
-        _wpAttack setWaypointSpeed "NORMAL";
-        _airGroup setCombatMode "RED"; 
-        _airGroup setBehaviour "AWARE"; // Crucial fix: "AWARE" prevents pilot evasive panic
-
-        // Specific Heli Logic: Anti-Stuck Thread
-        [_aircraft] spawn {
-            params ["_heli"];
-            private _lastPos = getPos _heli;
-            private _stuckCount = 0;
-            while {alive _heli} do {
-                sleep 5;
-                if ((getPos _heli) distance2D _lastPos < 5) then { _stuckCount = _stuckCount + 5; } else { _stuckCount = 0; };
-                if (_stuckCount >= 45) exitWith { {deleteVehicle _x} forEach crew _heli; deleteVehicle _heli; };
-                _lastPos = getPos _heli;
+    // ============================================================
+    // === SCRIPT 1: ENEMY REVEAL (delete this block to disable) ==
+    // ============================================================
+    [_aircraft, _dropPos] spawn {
+        params ["_heli", "_targetPos"];
+        while {alive _heli} do {
+            private _grp = group _heli;
+            if (!isNull _grp) then {
+                private _enemies = (_targetPos nearEntities [["Man","Car","Tank","StaticWeapon","Air"], 700]) select {
+                    alive _x && {(side _x) getFriend (side _grp) < 0.6}
+                };
+                { _grp reveal [_x, 4] } forEach _enemies;
             };
-        };
-
-        // RTB Thread
-        [_aircraft, _airGroup, _spawnPos, _rtbTime] spawn {
-            params ["_aircraft", "_airGroup", "_spawnPos", "_rtbTime"];
-            sleep 120;
-            if (alive _aircraft) then { _aircraft allowDamage true; { if (alive _x) then { _x allowDamage true; }; } forEach crew _aircraft; };
-            private _remainingTime = _rtbTime - 120;
-            if (_remainingTime > 0) then { sleep _remainingTime; };
-            if (alive _aircraft) then {
-                while {(count (waypoints _airGroup)) > 0} do { deleteWaypoint ((waypoints _airGroup) select 0); };
-                _airGroup setBehaviour "CARELESS"; _airGroup setCombatMode "BLUE";
-                private _wpAway = _airGroup addWaypoint [_spawnPos, 0];
-                _wpAway setWaypointType "MOVE"; _wpAway setWaypointSpeed "FULL";
-                _wpAway setWaypointStatements ["true", "private _v = vehicle this; {deleteVehicle _x} forEach crew _v; deleteVehicle _v;"];
-            };
+            sleep 5;
         };
     };
+    // === END SCRIPT 1 ======================================
+
+    // ============================================================
+    // === SCRIPT 2: PILOT SALVO (delete this block to disable) ==
+    // ============================================================
+    _aircraft setVariable ["AAS_lastPilotSalvo", -100];
+    private _pilot = driver _aircraft;
+    if (!isNull _pilot) then {
+        _pilot addEventHandler ["FiredMan", {
+            params ["_unit", "_weapon"];
+            private _veh = vehicle _unit;
+            if (_veh isEqualTo _unit) exitWith {};
+
+            // Only react to pilot-turret weapons (safety check)
+            if (!(_weapon in (_veh weaponsTurret [-1]))) exitWith {};
+
+            // Cooldown gate
+            private _last = _veh getVariable ["AAS_lastPilotSalvo", -100];
+            if ((time - _last) < 3) exitWith {};
+            _veh setVariable ["AAS_lastPilotSalvo", time];
+
+            private _otherWeapons = (_veh weaponsTurret [-1]) - [_weapon];
+            if (_otherWeapons isEqualTo []) exitWith {};
+
+            private _target = _veh findNearestEnemy (getPosATL _veh);
+            if (isNull _target) exitWith {};
+
+            [_veh, _otherWeapons, _target] spawn {
+                params ["_veh", "_weapons", "_target"];
+                {
+                    private _wpn = _x;
+                    for "_i" from 1 to 2 do {
+                        if (alive _veh && {!isNull _target} && {alive _target}) then {
+                            _veh fireAtTarget [_target, _wpn];
+                            sleep 0.4;
+                        };
+                    };
+                } forEach _weapons;
+            };
+        }];
+    };
+    // === END SCRIPT 2 ======================================
+
+    // --- THE QRF ATTACK LOOP ---
+    // This is the only logic that matters. It forces a waypoint refresh every 15s.
+    [_airGroup, _dropPos] spawn {
+        params ["_grp", "_targetPos"];
+        
+        _grp setCombatMode "RED";
+        _grp setBehaviour "COMBAT";
+        
+        while {count units _grp > 0} do {
+            while {(count (waypoints _grp)) > 0} do { deleteWaypoint ((waypoints _grp) select 0); };
+            
+            private _wp = _grp addWaypoint [_targetPos getPos [random 50, random 360], 0]; 
+            _wp setWaypointType "SAD"; 
+            _wp setWaypointSpeed "NORMAL";
+            
+            sleep 15; 
+        };
+    };
+    // RTB Thread
+    [_aircraft, _airGroup, _spawnPos, parseNumber AAS_RTB_CAS] spawn {
+        params ["_aircraft", "_airGroup", "_spawnPos", "_rtbTime"];
+        sleep _rtbTime;
+        if (alive _aircraft) then {
+            while {(count (waypoints _airGroup)) > 0} do { deleteWaypoint ((waypoints _airGroup) select 0); };
+            private _wpAway = _airGroup addWaypoint [_spawnPos, 0];
+            _wpAway setWaypointType "MOVE";
+            _wpAway setWaypointStatements ["true", "{deleteVehicle _x} forEach (crew (vehicle this) + [vehicle this]);"];
+        };
+    };
+};
 
     // ---------------------------------------------------------------------
     // CASE C: GUNSHIP (UNCHANGED EXCEPT PHANTOM Z-OFFSET SCRIPT)
