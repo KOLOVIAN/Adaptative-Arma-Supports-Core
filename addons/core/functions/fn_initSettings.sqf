@@ -316,6 +316,45 @@ private _values   = ["__custom__", "__default__"]                               
 
 AAS_Template_UI_Ready = false;
 
+// Server-side template application function.
+// Defined globally so it can be invoked via remoteExec by name (BattlEye-safe vs. anonymous code).
+// The full _settings payload is shipped from the admin's client, so the server does NOT need the
+// template installed in its own profile — the admin effectively "shares" the template on selection.
+// On SP / listen server: target 2 = local machine, so remoteExec runs it in-place.
+// On dedicated:          target 2 = the server, so the change applies for everyone.
+AAS_fnc_applyTemplate = {
+    params ["_val", ["_settings", []]];
+
+    if (_val == "__custom__") exitWith {
+        profileNamespace setVariable ["AAS_ActiveTemplate", []];
+        saveProfileNamespace;
+        "[AAS] Custom mode — your manual CBA settings are preserved." remoteExec ["systemChat", 0];
+    };
+
+    if (_val == "__default__") exitWith {
+        { [_x select 0, _x select 1, 2, "server"] call CBA_settings_fnc_set; } forEach AAS_VanillaDefaults;
+        profileNamespace setVariable ["AAS_ActiveTemplate", []];
+        saveProfileNamespace;
+        "[AAS] Reset to Vanilla NATO defaults." remoteExec ["systemChat", 0];
+    };
+
+    // Payload came from the admin's client — apply it directly, no server-side lookup.
+    if (count _settings == 0) exitWith {
+        "[AAS] Template data was empty — nothing applied." remoteExec ["systemChat", 0];
+    };
+
+    // Persist on the server so it survives mission restarts and is registered for next time.
+    private _registry = profileNamespace getVariable ["AAS_Template_Registry", []];
+    private _idx = _registry findIf { (_x select 0) == _val };
+    if (_idx >= 0) then { _registry set [_idx, [_val, _settings]]; } else { _registry pushBack [_val, _settings]; };
+    profileNamespace setVariable ["AAS_Template_Registry", _registry];
+
+    { [_x select 0, _x select 1, 2, "server"] call CBA_settings_fnc_set; } forEach _settings;
+    profileNamespace setVariable ["AAS_ActiveTemplate", _settings];
+    saveProfileNamespace;
+    (format ["[AAS] '%1' faction template applied by admin.", _val]) remoteExec ["systemChat", 0];
+};
+
 ["AAS_Selected_Template", "LIST",
     ["Faction Template", "Select an installed faction template. 'Custom' preserves your manually-set CBA values. 'Default' resets to Vanilla NATO. Place an [AAS FACTION] composition via Zeus to install custom templates."],
     ["AAS - CORE SETTINGS", "3. Faction Templates"],
@@ -325,38 +364,37 @@ AAS_Template_UI_Ready = false;
         params ["_val"];
         if (!AAS_Template_UI_Ready) exitWith {};
 
-        if (_val == "__custom__") exitWith {
-            profileNamespace setVariable ["AAS_ActiveTemplate", []];
-            saveProfileNamespace;
-            "[AAS] Custom mode — your manual CBA settings are preserved." remoteExec ["systemChat", 0];
+        // Built-in options carry no payload — just send the keyword to the server.
+        if (_val in ["__custom__", "__default__"]) exitWith {
+            [_val] remoteExec ["AAS_fnc_applyTemplate", 2];
         };
 
-        if (_val == "__default__") exitWith {
-            { [_x select 0, _x select 1, 2, "server"] call CBA_settings_fnc_set; } forEach AAS_VanillaDefaults;
-            profileNamespace setVariable ["AAS_ActiveTemplate", []];
-            saveProfileNamespace;
-            "[AAS] Reset to Vanilla NATO defaults." remoteExec ["systemChat", 0];
-        };
-
+        // Resolve the full template from THIS machine's (the admin's) cache, then ship it to the
+        // server. This is how the admin "shares" their locally-installed template with the server.
         private _idx = AAS_Template_Registry_Cache findIf { (_x select 0) == _val };
-
         if (_idx < 0) exitWith {
-            "[AAS] Template not found — reinstall the composition." remoteExec ["systemChat", 0];
+            "[AAS] Template not found in your profile — reinstall the composition locally." remoteExec ["systemChat", 0];
         };
 
-        private _t = (AAS_Template_Registry_Cache select _idx) select 1;
-        { [_x select 0, _x select 1, 2, "server"] call CBA_settings_fnc_set; } forEach _t;
-        profileNamespace setVariable ["AAS_ActiveTemplate", _t];
-        saveProfileNamespace;
-        (format ["[AAS] '%1' faction template applied.", _val]) remoteExec ["systemChat", 0];
+        private _settings = (AAS_Template_Registry_Cache select _idx) select 1;
+
+        // SP / listen: target 2 = local machine → runs in-place.
+        // Dedicated:   target 2 = server          → admin's selection applies for everyone.
+        [_val, _settings] remoteExec ["AAS_fnc_applyTemplate", 2];
     }
 ] call CBA_fnc_addSetting;
 
 [] spawn {
     waitUntil { time > 0 };
     AAS_Template_UI_Ready = true;
-    private _active = profileNamespace getVariable ["AAS_ActiveTemplate", []];
-    if (count _active > 0) then {
-        { [_x select 0, _x select 1, 2, "server"] call CBA_settings_fnc_set; } forEach _active;
+
+    // Only the server re-applies the persistent active template on mission start.
+    // Previously this ran on every client and pushed stale local profile data with "server" force,
+    // which could trample the server's authoritative classnames.
+    if (isServer) then {
+        private _active = profileNamespace getVariable ["AAS_ActiveTemplate", []];
+        if (count _active > 0) then {
+            { [_x select 0, _x select 1, 2, "server"] call CBA_settings_fnc_set; } forEach _active;
+        };
     };
 };
