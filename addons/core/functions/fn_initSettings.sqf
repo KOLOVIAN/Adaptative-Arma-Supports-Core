@@ -362,25 +362,26 @@ AAS_fnc_applyTemplate = {
     false,
     {
         params ["_val"];
-        if (!AAS_Template_UI_Ready) exitWith {};
+    if (!AAS_Template_UI_Ready) exitWith {};
 
-        // Built-in options carry no payload — just send the keyword to the server.
-        if (_val in ["__custom__", "__default__"]) exitWith {
-            [_val] remoteExec ["AAS_fnc_applyTemplate", 2];
-        };
+    // Admin-only: block regular players from overwriting the server's template.
+    if (!(isServer || serverCommandAvailable "#kick")) exitWith {
+        systemChat "[AAS] Only an admin can change the active faction template.";
+    };
 
-        // Resolve the full template from THIS machine's (the admin's) cache, then ship it to the
-        // server. This is how the admin "shares" their locally-installed template with the server.
-        private _idx = AAS_Template_Registry_Cache findIf { (_x select 0) == _val };
-        if (_idx < 0) exitWith {
-            "[AAS] Template not found in your profile — reinstall the composition locally." remoteExec ["systemChat", 0];
-        };
+    // Built-in options carry no payload — just send the keyword to the server.
+    if (_val in ["__custom__", "__default__"]) exitWith {
+        [_val] remoteExec ["AAS_fnc_applyTemplate", 2];
+    };
 
-        private _settings = (AAS_Template_Registry_Cache select _idx) select 1;
+    // Resolve the full template from THIS machine's (the admin's) cache, then ship it to the server.
+    private _idx = AAS_Template_Registry_Cache findIf { (_x select 0) == _val };
+    if (_idx < 0) exitWith {
+        "[AAS] Template not found in your profile — reinstall the composition locally." remoteExec ["systemChat", 0];
+    };
 
-        // SP / listen: target 2 = local machine → runs in-place.
-        // Dedicated:   target 2 = server          → admin's selection applies for everyone.
-        [_val, _settings] remoteExec ["AAS_fnc_applyTemplate", 2];
+    private _settings = (AAS_Template_Registry_Cache select _idx) select 1;
+    [_val, _settings] remoteExec ["AAS_fnc_applyTemplate", 2];
     }
 ] call CBA_fnc_addSetting;
 
