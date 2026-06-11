@@ -13,11 +13,11 @@ AAS_Loaded_Modules pushBackUnique "LOGISTICS";
 // --- TARGETING STATE MACHINE (TRANSPORT ONLY) ---
 // =========================================================
 aas_logistics_fnc_startMapTargeting = {
-    // FIX: Added _transportType parameter so the server knows which heli to spawn
-    params ["_caller", ["_transportType", "Standard"]];
+    // BUGFIX: Added _smokeObj parameter to carry the grenade object into the map phase safely
+    params ["_caller", "_lzPos", ["_transportType", "Standard"], ["_smokeObj", objNull]];
     
-    [_caller, _transportType] spawn {
-        params ["_caller", "_transportType"];
+    [_caller, _lzPos, _transportType, _smokeObj] spawn {
+        params ["_caller", "_lzPos", "_transportType", "_smokeObj"];
 
         if (isNull (findDisplay 8990)) then {
             systemChat "HQ: Plot your flight path. Left-Click to add waypoint. Right-Click to undo. SPACE to confirm";
@@ -52,27 +52,24 @@ aas_logistics_fnc_startMapTargeting = {
             ctrlMapAnimCommit _mapCtrl;
             
             // --- ROUTE PLOTTER INITIALIZATION ---
-            private _lzObj = missionNamespace getVariable ["AAS_Active_Smoke", objNull];
-            private _lzPos = if (isNull _lzObj) then { getPos _caller } else { getPos _lzObj };
-            
             _caller setVariable ["AAS_Path_LZ", _lzPos];
             _caller setVariable ["AAS_Flight_Path", []];
             _caller setVariable ["AAS_Path_Confirmed", false];
+            
+            // Store the smoke object locally so it survives the UI wait time
+            _caller setVariable ["AAS_Transport_Smoke_Temp", _smokeObj];
 
             // --- PAGER UI OVERRIDE & SYNC LOOP ---
             [_caller] spawn {
                 disableSerialization;
                 params ["_caller"];
                 
-                // Force-open the "dummy" pager since the core mod auto-closed it
                 ("AAS_Pager_Layer" call BIS_fnc_rscLayer) cutRsc ["AAS_Pager_HUD", "PLAIN"];
                 
-                // Keep updating the pager while the map is open
                 while { !isNull (findDisplay 8990) } do {
                     private _pagerDisplay = uiNamespace getVariable ["AAS_Pager_Display", displayNull];
                     if (!isNull _pagerDisplay) then {
                         
-                        // Apply the correct theme to the dummy pager
                         private _bgCtrl = _pagerDisplay displayCtrl 1200;
                         if (!isNull _bgCtrl) then {
                             private _themeTextures = call aas_core_fnc_getActiveThemeTextures;
@@ -86,7 +83,6 @@ aas_logistics_fnc_startMapTargeting = {
                         private _i1 = _ctrl lbAdd "[ PLOTTING FLIGHT ]";
                         private _i2 = _ctrl lbAdd "";
                         
-                        // Dynamically build the Waypoint UI Array
                         private _wpStr = "";
                         for "_i" from 1 to 5 do {
                             if (_i <= count _path) then {
@@ -101,7 +97,6 @@ aas_logistics_fnc_startMapTargeting = {
                         private _i5 = _ctrl lbAdd "SPACE: Confirm";
                         private _i6 = _ctrl lbAdd "R-CLICK: Undo WP";
 
-                        // Lock selection so it just looks like a screen read-out
                         _ctrl lbSetValue [_i1, -1]; _ctrl lbSetValue [_i2, -1]; 
                         _ctrl lbSetValue [_i3, -1]; _ctrl lbSetValue [_i4, -1];
                         _ctrl lbSetValue [_i5, -1]; _ctrl lbSetValue [_i6, -1];
@@ -110,7 +105,6 @@ aas_logistics_fnc_startMapTargeting = {
                     sleep 0.1;
                 };
                 
-                // When map closes, kill the pager screen simultaneously
                 ("AAS_Pager_Layer" call BIS_fnc_rscLayer) cutText ["", "PLAIN"];
             };
 
@@ -118,19 +112,28 @@ aas_logistics_fnc_startMapTargeting = {
             _mapCtrl ctrlAddEventHandler ["MouseButtonClick", {
                 params ["_control", "_button", "_xPos", "_yPos"];
                 private _path = player getVariable ["AAS_Flight_Path", []];
+                private _lzPos = player getVariable ["AAS_Path_LZ", getPos player];
+                private _exclusionRadius = 500; 
                 
-                if (_button == 0) then { // LEFT CLICK (Add WP)
-                    if (count _path < 5) then {
-                        private _worldPos = _control ctrlMapScreenToWorld [_xPos, _yPos];
-                        _path pushBack [_worldPos select 0, _worldPos select 1, 0];
-                        player setVariable ["AAS_Flight_Path", _path];
-                        playSound "ReadoutClick";
+                if (_button == 0) then { 
+                    private _worldPos = _control ctrlMapScreenToWorld [_xPos, _yPos];
+                    
+                    if (_worldPos distance2D _lzPos < _exclusionRadius) then {
+                        // BUGFIX: Native vanilla UI error sound
+                        playSound "3DEN_notificationWarning"; 
+                        systemChat "HQ: Invalid coordinates. Destination is too close to the extraction LZ.";
                     } else {
-                        systemChat "HQ: Maximum 5 waypoints allowed.";
+                        if (count _path < 5) then {
+                            _path pushBack [_worldPos select 0, _worldPos select 1, 0];
+                            player setVariable ["AAS_Flight_Path", _path];
+                            playSound "ReadoutClick";
+                        } else {
+                            systemChat "HQ: Maximum 5 waypoints allowed.";
+                        };
                     };
                 };
                 
-                if (_button == 1) then { // RIGHT CLICK (Undo WP)
+                if (_button == 1) then { 
                     if (count _path > 0) then {
                         _path deleteAt (count _path - 1);
                         player setVariable ["AAS_Flight_Path", _path];
@@ -142,8 +145,8 @@ aas_logistics_fnc_startMapTargeting = {
             // --- KEYBOARD HANDLER (SPACE TO CONFIRM) ---
             _disp displayAddEventHandler ["KeyDown", {
                 params ["_display", "_key"];
-                if (_key == 14) exitWith { _display closeDisplay 2; true }; // Escape/Backspace (Cancel)
-                if (_key == 57) exitWith { // Spacebar (Confirm)
+                if (_key == 14) exitWith { _display closeDisplay 2; true }; 
+                if (_key == 57) exitWith { 
                     if (count (player getVariable ["AAS_Flight_Path", []]) > 0) then {
                         player setVariable ["AAS_Path_Confirmed", true];
                         _display closeDisplay 1; 
@@ -160,30 +163,30 @@ aas_logistics_fnc_startMapTargeting = {
                 params ["_map"];
                 private _path = player getVariable ["AAS_Flight_Path", []];
                 private _lzPos = player getVariable ["AAS_Path_LZ", getPos player];
+                private _exclusionRadius = 500; 
+                
+                // BUGFIX: Hollow red outline (Replaced the fill string with "")
+                _map drawEllipse [_lzPos, _exclusionRadius, _exclusionRadius, 0, [0.8, 0, 0, 1], ""];
                 
                 if (count _path > 0) then {
                     private _lastPos = _lzPos;
                     {
-                        // Draw flight vector line (Thickness set to 6, Color changed to RED)
                         _map drawLine [_lastPos, _x, [0.8, 0, 0, 1], 6]; 
                         
                         private _icon = "\a3\ui_f\data\map\markers\military\dot_ca.paa";
                         private _text = format ["WP %1", _forEachIndex + 1];
                         
-                        // If it is the final node, show destination prompt
                         if (_forEachIndex == (count _path) - 1) then {
                             _icon = "\a3\ui_f\data\map\markers\military\pickup_ca.paa";
                             _text = "DESTINATION (SPACE TO CONFIRM)";
                         };
                         
-                        // Text and icon color changed to RED
                         _map drawIcon [_icon, [0.8, 0, 0, 1], _x, 24, 24, 0, _text, 1, 0.05, "PuristaBold", "right"];
                         _lastPos = _x;
                     } forEach _path;
                 };
             }];
 
-            // Wait for display to close (either via ESC or Spacebar)
             waitUntil { sleep 0.1; isNull (findDisplay 8990) };
             
             private _finalPath = _caller getVariable ["AAS_Flight_Path", []];
@@ -195,7 +198,10 @@ aas_logistics_fnc_startMapTargeting = {
                 systemChat format ["[AAS] Flight plan confirmed. %1 helicopter called.", _heliTypeString];
                 playSound "ReadoutClick";
                 
-                // FIX: Pass the Transport Type alongside the flight path
+                // BUGFIX: Inject the saved smoke object into the server right as execution happens
+                private _smokeTemp = _caller getVariable ["AAS_Transport_Smoke_Temp", objNull];
+                _caller setVariable ["AAS_Server_Smoke", _smokeTemp, true];
+
                 [_caller, _finalPath, _transportType] remoteExec ["aas_logistics_fnc_servertransport", 2];
             } else {
                 systemChat "[AAS] Transport request cancelled.";
@@ -251,7 +257,10 @@ aas_logistics_fnc_refreshLogistics = {
         private _transName = ["Request EXFIL", "AAS_LOG_Transport_CostMult"] call _fnc_formatName;
         _logisticsMenu pushBack [
             _transName, 
-            compile " [player, 'Standard'] spawn aas_logistics_fnc_startMapTargeting; "
+            compile " 
+                private _smoke = missionNamespace getVariable ['AAS_Active_Smoke', objNull];
+                [_this select 0, _this select 1, 'Standard', _smoke] spawn aas_logistics_fnc_startMapTargeting; 
+            "
         ];
     };
 
@@ -263,7 +272,10 @@ aas_logistics_fnc_refreshLogistics = {
         private _heavyTransName = ["Request EXFIL (HVY)", "AAS_LOG_TransportHeavy_CostMult"] call _fnc_formatName;
         _logisticsMenu pushBack [
             _heavyTransName, 
-            compile " [player, 'Heavy'] spawn aas_logistics_fnc_startMapTargeting; "
+            compile " 
+                private _smoke = missionNamespace getVariable ['AAS_Active_Smoke', objNull];
+                [_this select 0, _this select 1, 'Heavy', _smoke] spawn aas_logistics_fnc_startMapTargeting; 
+            "
         ];
     };
 
@@ -271,11 +283,9 @@ aas_logistics_fnc_refreshLogistics = {
         params ["_categoryName", "_prefix", "_count"];
         private _subMenu = [];
         
-        // --- DUAL COOLDOWN LOGIC: Check 1-Min Global Cooldown First ---
         private _globalDelivLast = missionNamespace getVariable ["AAS_LOG_LastUse_Delivery_Global", -99999];
 
         if (serverTime >= (_globalDelivLast + 60)) then {
-            // Check Individual Item Cooldowns
             private _itemCd = parseNumber (missionNamespace getVariable ["AAS_LOG_Cooldown_Delivery", "600"]);
 
             for "_i" from 1 to _count do {
@@ -286,9 +296,7 @@ aas_logistics_fnc_refreshLogistics = {
                 private _execId = format ["%1%2", _prefix, _i];
                 private _itemLastUse = missionNamespace getVariable [format ["AAS_LOG_LastUse_Delivery_%1", _execId], -99999];
 
-                // Only add it if the specific item is off cooldown AND a valid string is detected
                 if (_rawName != "" && {serverTime >= (_itemLastUse + _itemCd)}) then {
-                    // Fail-safe for Compositions: Only show if the admin actually pasted a valid array
                     if (_prefix == "Comp" && {missionNamespace getVariable [format ["AAS_LOG_%1%2_Code", _prefix, _i], ""] == ""}) then {
                         continue;
                     };
@@ -298,9 +306,9 @@ aas_logistics_fnc_refreshLogistics = {
                     _subMenu pushBack [
                         _itemName,
                         compile format ["
-                            private _lzObj = missionNamespace getVariable ['AAS_Active_Smoke', objNull];
-                            private _lz = if (isNull _lzObj) then { getPos player } else { getPos _lzObj };
-                            [player, _lz, '%1'] remoteExec ['aas_logistics_fnc_serverdelivery', 2];
+                            private _smoke = missionNamespace getVariable ['AAS_Active_Smoke', objNull];
+                            player setVariable ['AAS_Server_Smoke', _smoke, true];
+                            [_this select 0, _this select 1, '%1'] remoteExec ['aas_logistics_fnc_serverdelivery', 2];
                         ", _execId]
                     ];
                 };

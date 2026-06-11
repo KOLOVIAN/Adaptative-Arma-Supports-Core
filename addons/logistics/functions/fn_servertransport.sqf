@@ -1,13 +1,12 @@
 // AAS-Logistics/functions/fn_servertransport.sqf
 /* Author: AAS Team
-    Description: Master Route for Logistics Transport (Real-Time Flight).
-    Spawns bulletproof heli, executes fast pickups, accepts multi-waypoint route plotting,
-    allows mid-flight redirects (locked on final approach), handles dynamic radio comms,
-    and includes a live-updating map marker for the extraction countdown.
-    *Now supports Dynamic Standard/Heavy classes and Adjustable Flight Altitude.*
+   Description: Master Route for Logistics Transport (Real-Time Flight).
+   Spawns bulletproof heli, executes fast pickups, accepts multi-waypoint route plotting,
+   allows mid-flight redirects (locked on final approach), handles dynamic radio comms,
+   and includes a live-updating map marker for the extraction countdown.
+   *Now supports Dynamic Standard/Heavy classes and Adjustable Flight Altitude.*
 */
 
-// FIX: Added _transportType parameter
 params ["_caller", "_flightPath", ["_transportType", "Standard"]];
 if (!isServer) exitWith {};
 
@@ -102,8 +101,27 @@ private _fnc_parseClass = {
 // ==========================================
 // --- 4. LZ DEFINITION & HELI SPAWN ---
 // ==========================================
-private _lzObj = missionNamespace getVariable ["AAS_Active_Smoke", objNull];
-private _lz = if (isNull _lzObj) then { getPos _caller } else { getPos _lzObj };
+
+// BUGFIX: Read the synced grenade object from the caller and track its bounce
+private _lzObj = _caller getVariable ["AAS_Server_Smoke", objNull];
+private _lz = [];
+
+if (!isNull _lzObj) then {
+    // Wait until the grenade physically stops moving
+    waitUntil { sleep 0.25; (speed _lzObj) == 0 || isNull _lzObj };
+    
+    // Failsafe in case it was deleted right as it stopped
+    if (!isNull _lzObj) then { 
+        _lz = getPos _lzObj; 
+    } else { 
+        _lz = getPos _caller; 
+    };
+    
+    // Clean up the variable so it doesn't interfere with future requests
+    _caller setVariable ["AAS_Server_Smoke", objNull, true];
+} else {
+    _lz = getPos _caller;
+};
 
 private _helipad = createVehicle ["Land_HelipadEmpty_F", _lz, [], 0, "NONE"];
 
@@ -127,21 +145,43 @@ if (_heliLoadout isNotEqualTo false) then {
 
 // --- AI BULLETPROOFING & SPEED HACKS ---
 _heli allowDamage false;
-_heli setCaptive true; 
+_heli setCaptive true; // Makes heli invisible to enemy AI targeting
+
+// --- AI BULLETPROOFING & SPEED HACKS ---
+_heli allowDamage false;
+_heli setCaptive true; // Keeps heli from being primary target
+
+// 1. Pilot Group: Completely blind/deaf to maximize flight stability
 _heliGroup setBehaviour "CARELESS";
-_heliGroup setCombatMode "BLUE";
-_heliGroup setSpeedMode "FULL";
+_heliGroup setCombatMode "BLUE"; 
+
+// 2. Gunner Group: Fully enabled for combat
+_gunnerGroup setBehaviour "COMBAT"; // Forces gunners to scan for threats
+_gunnerGroup setCombatMode "RED";    // Free to engage
+_gunnerGroup setSpeedMode "FULL";
 
 { 
     _x allowDamage false;
-    _x setCaptive true; 
-    _x addRating 100000; 
-    [_x] joinSilent _heliGroup; 
+    _x addRating 100000;
+    
+    if (_x == driver _heli) then {
+        [_x] joinSilent _heliGroup;
+        // Pilot stays lobotomized
+        { _x disableAI _y } forEach ["AUTOTARGET", "TARGET", "SUPPRESSION", "AUTOCOMBAT", "MINEDETECTION", "FSM", "COVER"];
+    } else {
+        [_x] joinSilent _gunnerGroup;
+        // Gunners are unleashed
+        { _x enableAI _y } forEach ["AUTOTARGET", "TARGET", "AUTOCOMBAT", "FSM"];
+    };
 } forEach crew _heli;
 
 _heli setVariable ["AAS_Original_Crew", crew _heli];
 
-{ _heliGroup disableAI _x } forEach ["AUTOTARGET", "TARGET", "SUPPRESSION", "AUTOCOMBAT", "MINEDETECTION"];
+// BUGFIX: LOBOTOMIZE THE PILOT ONLY
+private _pilot = driver _heli;
+if (!isNull _pilot) then {
+    { _pilot disableAI _x } forEach ["AUTOTARGET", "TARGET", "SUPPRESSION", "AUTOCOMBAT", "MINEDETECTION", "FSM", "COVER"];
+};
 
 private _flightHeight = missionNamespace getVariable ["AAS_LOG_Transport_FlightHeight", 70];
 _heli flyInHeight _flightHeight; 
@@ -155,8 +195,8 @@ _wpLand setWaypointStatements ["true", "(vehicle this) land 'GET IN';"];
 // ==========================================
 // --- 5. EXECUTION THREAD ---
 // ==========================================
-[_heli, _heliGroup, _lz, _flightPath, _finalDest, _helipad, _caller, _flightHeight] spawn {
-    params ["_heli", "_heliGroup", "_lz", "_flightPath", "_finalDest", "_helipad", "_caller", "_flightHeight"];
+[_heli, _heliGroup, _gunnerGroup, _lz, _flightPath, _finalDest, _helipad, _caller, _flightHeight] spawn {
+    params ["_heli", "_heliGroup", "_gunnerGroup", "_lz", "_flightPath", "_finalDest", "_helipad", "_caller", "_flightHeight"];
     
     // --- COMMS SWITCHBOARD HELPER ---
     private _fnc_comms = {
@@ -184,26 +224,25 @@ _wpLand setWaypointStatements ["true", "(vehicle this) land 'GET IN';"];
     // --- SCRIPTED ENGINE CLAMP HELPER ---
     private _fnc_toggleClamp = {
         params ["_heli", "_state"];
-        // Check if the optional compatibility clamp is enabled in CBA settings
         private _useClamp = missionNamespace getVariable ["AAS_LOG_Transport_Clamp", false];
-        if (!_useClamp) exitWith {}; // 100% Ignored if toggled off
+        if (!_useClamp) exitWith {}; 
+
+        private _origCrew = _heli getVariable ["AAS_Original_Crew", []];
 
         if (_state) then {
             _heli setVariable ["AAS_Clamp_Active", true];
             
-            // Aggressive loop to force the engine off
-            [_heli] spawn {
-                params ["_h"];
+            [_heli, _origCrew] spawn {
+                params ["_h", "_crew"];
                 while {alive _h && _h getVariable ["AAS_Clamp_Active", false]} do {
                     _h engineOn false;
-                    // Disable pathing just in case the AI tries to taxi without the engine
-                    { _x disableAI "PATH"; } forEach (crew _h select { !isPlayer _x });
+                    { _x disableAI "PATH"; } forEach _crew;
                     sleep 1;
                 };
             };
         } else {
             _heli setVariable ["AAS_Clamp_Active", false];
-            { _x enableAI "PATH"; } forEach (crew _heli select { !isPlayer _x });
+            { _x enableAI "PATH"; } forEach _origCrew;
             _heli engineOn true;
         };
     };
@@ -226,7 +265,7 @@ _wpLand setWaypointStatements ["true", "(vehicle this) land 'GET IN';"];
     // >>>> ACTIVATE ENGINE CLAMP <<<<
     [_heli, true] call _fnc_toggleClamp;
 
-    _heli engineOn true; // Ignored immediately if clamp loop is active
+    _heli engineOn true;
     _heli setVariable ["AAS_ReadyToGo", false, true];
 
     // --- PHASE 2: BOARDING & LIVE MARKER ---
@@ -239,18 +278,16 @@ _wpLand setWaypointStatements ["true", "(vehicle this) land 'GET IN';"];
         ]
     ] remoteExec ["addAction", 0, _heli];
 
-    // Create the live countdown marker on the map
     private _extMarkerName = format ["AAS_Ext_Marker_%1", floor(random 100000)];
     private _extMarker = createMarker [_extMarkerName, getPos _heli];
-    _extMarker setMarkerType "b_air";        // NATO Helicopter Symbol
-    _extMarker setMarkerColor "ColorGreen";  // Dark/Standard Green
+    _extMarker setMarkerType "b_air";
+    _extMarker setMarkerColor "ColorGreen";
 
     private _timeout = serverTime + 180;
     waitUntil { 
         sleep 1; 
         private _timeLeft = 0 max round (_timeout - serverTime);
         
-        // Pin marker to heli and update text every second
         _extMarker setMarkerPos (getPos _heli);
         _extMarker setMarkerText format [" EXTRACTION (%1s)", _timeLeft];
         
@@ -259,7 +296,6 @@ _wpLand setWaypointStatements ["true", "(vehicle this) land 'GET IN';"];
         !alive _heli
     };
 
-    // Delete the marker the exact moment they take off
     deleteMarker _extMarker;
     if (!alive _heli) exitWith { deleteVehicle _helipad; };
 
@@ -277,13 +313,11 @@ _wpLand setWaypointStatements ["true", "(vehicle this) land 'GET IN';"];
     _heli setVariable ["AAS_Active_Pad", _destPad]; 
     _heli setVariable ["AAS_Current_Target_Dest", _finalDest, true]; 
     
-    // Inject the plotted waypoints
     {
         private _wp = _heliGroup addWaypoint [_x, 0];
         _wp setWaypointType "MOVE";
         _wp setWaypointSpeed "FULL";
         
-        // Only the final waypoint executes the landing
         if (_forEachIndex == (count _flightPath) - 1) then {
             _wp setWaypointStatements ["true", "(vehicle this) land 'GET OUT';"]; 
         };
@@ -293,7 +327,6 @@ _wpLand setWaypointStatements ["true", "(vehicle this) land 'GET IN';"];
     
     waitUntil { sleep 1; (getPos _heli select 2) > 5 || !alive _heli };
     
-    // 10 Seconds After Takeoff Audio
     sleep 10;
     private _takeoffLines = [
         ["log_transport4", "PILOT: Proceeding to destination. Buckle up!"],
@@ -385,7 +418,6 @@ _wpLand setWaypointStatements ["true", "(vehicle this) land 'GET IN';"];
 
     while {alive _heli && !isTouchingGround _heli && (_heli distance2D _currentDest > 50)} do {
         
-        // Check for Redirect
         private _newDest = _heli getVariable ["AAS_New_Dest", []];
         if (_newDest isNotEqualTo []) then {
             _heli setVariable ["AAS_New_Dest", [], true]; 
@@ -407,7 +439,6 @@ _wpLand setWaypointStatements ["true", "(vehicle this) land 'GET IN';"];
             [_heli, _caller, "PILOT: Copy that, rerouting to new destination.", 2, "log_transport6"] call _fnc_comms;
         };
 
-        // Approaching Final Destination Audio
         if (!_300mTriggered && (_heli distance2D _currentDest < 300)) then {
             _300mTriggered = true;
             private _destLines = [
@@ -445,16 +476,9 @@ _wpLand setWaypointStatements ["true", "(vehicle this) land 'GET IN';"];
     // >>>> DEACTIVATE ENGINE CLAMP <<<<
     [_heli, false] call _fnc_toggleClamp;
 
-    // --- PASSENGER STATE CLEANUP ---
-    // Defensive: clear captive flag and re-enable combat AI on every disembarking passenger.
     { 
         if (!(_x in _originalCrew)) then { 
             private _passenger = _x;
-            _passenger setCaptive false;
-            { _passenger enableAI _x } forEach [
-                "AUTOTARGET", "TARGET", "SUPPRESSION", "AUTOCOMBAT", 
-                "MINEDETECTION", "FSM", "COVER", "CHECKVISIBLE", "MOVE", "PATH"
-            ];
             unassignVehicle _passenger;
             moveOut _passenger; 
         }; 
@@ -478,5 +502,7 @@ _wpLand setWaypointStatements ["true", "(vehicle this) land 'GET IN';"];
         { deleteVehicle _x } forEach crew _heli;
         deleteVehicle _heli;
     };
+    
     deleteGroup _heliGroup;
+    if (!isNull _gunnerGroup) then { deleteGroup _gunnerGroup; };
 };

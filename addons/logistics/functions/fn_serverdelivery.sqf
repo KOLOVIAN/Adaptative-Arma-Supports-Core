@@ -113,15 +113,19 @@ private _isContainerized = false;
 private _rawHeliClass = "";
 private _targetClass = "";
 private _targetLoadout = false;
-
-// --- DYNAMIC TOGGLE READ ---
-private _forceRope = missionNamespace getVariable [format ["AAS_LOG_%1_ForceRope", _execId], false];
+private _forceRope = false;
 
 if (_isComposition) then {
+    // --- COMPOSITIONS NOW READ THE GLOBAL FORCE ROPE TOGGLE ---
+    _forceRope = missionNamespace getVariable ["AAS_LOG_Comp_ForceRope", false];
+    
     _isContainerized = true;
     _rawHeliClass = missionNamespace getVariable ["AAS_LOG_Comp_Heli", "B_Heli_Transport_03_F"];
     _targetClass = missionNamespace getVariable [_varClass, ""]; 
 } else {
+    // --- VEHICLES & EQUIPMENT STILL READ THEIR SPECIFIC TOGGLES ---
+    _forceRope = missionNamespace getVariable [format ["AAS_LOG_%1_ForceRope", _execId], false];
+    
     _isContainerized = missionNamespace getVariable [format ["AAS_LOG_%1_Container", _execId], false];
     _rawHeliClass = missionNamespace getVariable [format ["AAS_LOG_%1_Heli", _execId], "B_Heli_Transport_03_F"];
     
@@ -179,12 +183,14 @@ if (_isContainerized) then {
         if (_targetLoadout isEqualType "") then { _payloadObj call compile _targetLoadout; };
     };
     
+    // BUGFIX: NATIVE DROP UAV CHECK
     if (getNumber (configFile >> "CfgVehicles" >> typeOf _payloadObj >> "isUav") == 1) then {
         createVehicleCrew _payloadObj;
         private _turretGroup = group (crew _payloadObj select 0);
         private _newGroup = createGroup _playerSide;
         (crew _payloadObj) joinSilent _newGroup;
         deleteGroup _turretGroup;
+        { _x addRating 100000; } forEach crew _payloadObj;
     };
     
     // FIX: Save original mass before altering it for slingloading
@@ -526,12 +532,14 @@ _wpMove setWaypointSpeed "FULL";
                             };
                         };
                         
+                        // BUGFIX: COMPOSITION UAV CHECK
                         if (!_isSimple && {getNumber (configFile >> "CfgVehicles" >> typeOf _obj >> "isUav") == 1}) then {
                             createVehicleCrew _obj;
                             private _tGroup = group (crew _obj select 0);
                             private _nGroup = createGroup _playerSide;
                             (crew _obj) joinSilent _nGroup;
                             deleteGroup _tGroup;
+                            { _x addRating 100000; } forEach crew _obj;
                         };
                         
                         _obj setVariable ["AAS_Is_Simple", _isSimple];
@@ -610,12 +618,14 @@ _wpMove setWaypointSpeed "FULL";
                     _realVehicle setDir _origDir;
                     _realVehicle allowDamage false; 
                     
+                    // BUGFIX: SINGLE UNPACK UAV CHECK
                     if (getNumber (configFile >> "CfgVehicles" >> typeOf _realVehicle >> "isUav") == 1) then {
                         createVehicleCrew _realVehicle;
                         private _turretGroup = group (crew _realVehicle select 0);
                         private _newGroup = createGroup _playerSide;
                         (crew _realVehicle) joinSilent _newGroup;
                         deleteGroup _turretGroup;
+                        { _x addRating 100000; } forEach crew _realVehicle;
                     };
                     
                     if (_targetLoadout isNotEqualTo false) then {
@@ -666,7 +676,7 @@ _wpMove setWaypointSpeed "FULL";
     } else {
         if (alive _payloadObj) then {
             [_payloadObj] spawn {
-                sleep 15;
+                sleep 5;
                 if (alive (_this select 0)) then { 
                     (_this select 0) allowDamage true; 
                     
