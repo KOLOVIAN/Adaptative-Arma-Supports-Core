@@ -147,31 +147,24 @@ if (_heliLoadout isNotEqualTo false) then {
 _heli allowDamage false;
 _heli setCaptive true; // Makes heli invisible to enemy AI targeting
 
-// --- AI BULLETPROOFING & SPEED HACKS ---
-_heli allowDamage false;
-_heli setCaptive true; // Keeps heli from being primary target
+// BUGFIX: THE "DEAF PILOT" TRICK
+private _gunnerGroup = createGroup _playerSide;
 
-// 1. Pilot Group: Completely blind/deaf to maximize flight stability
-_heliGroup setBehaviour "CARELESS";
-_heliGroup setCombatMode "BLUE"; 
+_heliGroup setBehaviour "CARELESS"; // Pilot's group ignores everything to guarantee landing
+_heliGroup setCombatMode "BLUE";
+_heliGroup setSpeedMode "FULL";
 
-// 2. Gunner Group: Fully enabled for combat
-_gunnerGroup setBehaviour "COMBAT"; // Forces gunners to scan for threats
-_gunnerGroup setCombatMode "RED";    // Free to engage
-_gunnerGroup setSpeedMode "FULL";
+_gunnerGroup setBehaviour "AWARE";  // Gunners' group seeks and destroys
+_gunnerGroup setCombatMode "RED";
 
 { 
     _x allowDamage false;
-    _x addRating 100000;
+    _x addRating 100000; // Prevents friendly fire issues (Antistasi/Overthrow)
     
     if (_x == driver _heli) then {
         [_x] joinSilent _heliGroup;
-        // Pilot stays lobotomized
-        { _x disableAI _y } forEach ["AUTOTARGET", "TARGET", "SUPPRESSION", "AUTOCOMBAT", "MINEDETECTION", "FSM", "COVER"];
     } else {
         [_x] joinSilent _gunnerGroup;
-        // Gunners are unleashed
-        { _x enableAI _y } forEach ["AUTOTARGET", "TARGET", "AUTOCOMBAT", "FSM"];
     };
 } forEach crew _heli;
 
