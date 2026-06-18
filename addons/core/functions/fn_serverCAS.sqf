@@ -431,12 +431,27 @@ switch (_casType) do {
     _aircraft allowDamage false;
     { _x allowDamage false; } forEach crew _aircraft;
 
+    // RTB flag — read by all support loops so they can exit cleanly when RTB starts
+    _aircraft setVariable ["AAS_CAS_Heli_RTB", false];
+
+    // ============================================================
+    // === 90-SECOND IMMORTALITY BUFFER ==========================
+    // ============================================================
+    [_aircraft] spawn {
+        params ["_heli"];
+        sleep 90;
+        if (alive _heli) then {
+            _heli allowDamage true;
+            { if (alive _x) then { _x allowDamage true; }; } forEach crew _heli;
+        };
+    };
+
     // ============================================================
     // === SCRIPT 1: ENEMY REVEAL (delete this block to disable) ==
     // ============================================================
     [_aircraft, _dropPos] spawn {
         params ["_heli", "_targetPos"];
-        while {alive _heli} do {
+        while {alive _heli && !(_heli getVariable ["AAS_CAS_Heli_RTB", false])} do {
             private _grp = group _heli;
             if (!isNull _grp) then {
                 private _enemies = (_targetPos nearEntities [["Man","Car","Tank","StaticWeapon","Air"], 700]) select {
@@ -459,6 +474,9 @@ switch (_casType) do {
             params ["_unit", "_weapon"];
             private _veh = vehicle _unit;
             if (_veh isEqualTo _unit) exitWith {};
+
+            // Don't pile on extra weapon fire once we're trying to leave the AO
+            if (_veh getVariable ["AAS_CAS_Heli_RTB", false]) exitWith {};
 
             // Only react to pilot-turret weapons (safety check)
             if (!(_weapon in (_veh weaponsTurret [-1]))) exitWith {};
@@ -491,14 +509,15 @@ switch (_casType) do {
     // === END SCRIPT 2 ======================================
 
     // --- THE QRF ATTACK LOOP ---
-    // This is the only logic that matters. It forces a waypoint refresh every 15s.
-    [_airGroup, _dropPos] spawn {
-        params ["_grp", "_targetPos"];
+    // Refreshes a SAD waypoint every 15s so the heli stays aggressive over the AO.
+    // Exits the moment the RTB flag flips so it stops overwriting the extraction waypoint.
+    [_aircraft, _airGroup, _dropPos] spawn {
+        params ["_heli", "_grp", "_targetPos"];
         
         _grp setCombatMode "RED";
         _grp setBehaviour "COMBAT";
         
-        while {count units _grp > 0} do {
+        while {alive _heli && {count units _grp > 0} && {!(_heli getVariable ["AAS_CAS_Heli_RTB", false])}} do {
             while {(count (waypoints _grp)) > 0} do { deleteWaypoint ((waypoints _grp) select 0); };
             
             private _wp = _grp addWaypoint [_targetPos getPos [random 50, random 360], 0]; 
@@ -508,19 +527,53 @@ switch (_casType) do {
             sleep 15; 
         };
     };
-    // RTB Thread
+
+    // ============================================================
+    // === BUG-PROOF RTB THREAD ===================================
+    // ============================================================
+    // 1. Signals RTB so the QRF loop and supporting scripts stop touching waypoints/weapons
+    // 2. Clears combat waypoints, forces CARELESS, pushes a MOVE to _spawnPos with self-delete on arrival
+    // 3. Hard 60s deadline — if the heli hasn't left cinematically by then, force-despawn it in place
     [_aircraft, _airGroup, _spawnPos, parseNumber AAS_RTB_CAS] spawn {
         params ["_aircraft", "_airGroup", "_spawnPos", "_rtbTime"];
         sleep _rtbTime;
+
+        // Flip the flag first so the QRF loop stops fighting us for the waypoint slot
+        if (!isNull _aircraft) then {
+            _aircraft setVariable ["AAS_CAS_Heli_RTB", true];
+        };
+
+        // If still flyable, set up a clean cinematic extraction
         if (alive _aircraft) then {
             while {(count (waypoints _airGroup)) > 0} do { deleteWaypoint ((waypoints _airGroup) select 0); };
+            _airGroup setBehaviour "CARELESS";
+            _airGroup setCombatMode "BLUE";
+            {
+                _x disableAI "TARGET";
+                _x disableAI "AUTOTARGET";
+                _x disableAI "AUTOCOMBAT";
+            } forEach (units _airGroup);
+
             private _wpAway = _airGroup addWaypoint [_spawnPos, 0];
             _wpAway setWaypointType "MOVE";
-            _wpAway setWaypointStatements ["true", "{deleteVehicle _x} forEach (crew (vehicle this) + [vehicle this]);"];
+            _wpAway setWaypointSpeed "FULL";
+            _wpAway setWaypointStatements ["true", "private _v = vehicle this; {deleteVehicle _x} forEach crew _v; deleteVehicle _v;"];
+        };
+
+        // 60-second hard deadline — exits early if the waypoint statement already deleted the heli
+        private _deadline = serverTime + 60;
+        waitUntil {
+            sleep 1;
+            isNull _aircraft || {serverTime > _deadline}
+        };
+
+        // Force-despawn whatever's left (timed-out flight, wreck, stuck heli, etc.)
+        if (!isNull _aircraft) then {
+            { if (!isNull _x) then { deleteVehicle _x; }; } forEach crew _aircraft;
+            deleteVehicle _aircraft;
         };
     };
 };
-
     // ---------------------------------------------------------------------
     // CASE C: GUNSHIP (UNCHANGED EXCEPT PHANTOM Z-OFFSET SCRIPT)
     // ---------------------------------------------------------------------
