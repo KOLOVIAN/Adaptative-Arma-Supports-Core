@@ -127,7 +127,14 @@ _heliGroup setCombatMode "BLUE";
     _x addRating 100000; 
 } forEach crew _heli;
 
-{ _heliGroup disableAI _x } forEach ["AUTOTARGET", "TARGET", "SUPPRESSION", "AUTOCOMBAT"];
+// FIX: disableAI is a UNIT command, not a GROUP command. The original
+// `_heliGroup disableAI _x` silently failed, leaving the supply crew able
+// to spot/track/relay targets. Iterate units of the group instead so the
+// AI lobotomy actually applies — the heli/plane now genuinely ignores enemies.
+{
+    private _aiFeature = _x;
+    { _x disableAI _aiFeature; } forEach (units _heliGroup);
+} forEach ["AUTOTARGET", "TARGET", "SUPPRESSION", "AUTOCOMBAT"];
 
 // --- 5. THE SKIP-ACTION WAYPOINTS ---
 _heli flyInHeight 100; // Raised to 100m to force the AI to ignore ground pathfinding
@@ -172,7 +179,26 @@ _wpEscape setWaypointStatements ["true", "private _v = vehicle this; {deleteVehi
 [_heli, _dropPos] spawn {
     params ["_heli", "_dropPos"];
 
-    waitUntil { sleep 0.1; (_heli distance2D _dropPos) < 75 || !alive _heli };
+    // FIX (Phase A): Wait for the heli to commit to the AO (within 200m of drop pos).
+    // This gates Phase B so AI navigation jitter during the 2.5km approach can't
+    // false-trigger the "distance growing" check below.
+    waitUntil { sleep 0.25; (_heli distance2D _dropPos) < 200 || !alive _heli };
+    if (!alive _heli) exitWith {};
+
+    // FIX (Phase B): Drop on close approach OR closest-pass detection.
+    // The original 75m proximity check stays as the fast-path trigger for normal
+    // flyovers. The new "_curDist > _prevDist" branch covers the failure mode
+    // where the AI banks toward the escape waypoint before ever reaching 75m —
+    // the moment distance starts growing, we know we're past closest approach
+    // and the crate goes out then. Drop happens every time, no missed deliveries.
+    private _prevDist = _heli distance2D _dropPos;
+    waitUntil {
+        sleep 0.25;
+        private _curDist = _heli distance2D _dropPos;
+        private _trigger = !alive _heli || _curDist < 75 || _curDist > _prevDist;
+        _prevDist = _curDist;
+        _trigger
+    };
 
     if (alive _heli) then {
         

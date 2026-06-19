@@ -781,8 +781,16 @@ switch (_category) do {
                     { _unit setSkill [_x, 1]; } forEach ["aimingAccuracy", "aimingShake", "aimingSpeed", "spotDistance", "spotTime", "commanding", "courage", "reloadSpeed"];
 
                     _unit moveInCargo _vehicle;
-                    _squad pushBack _unit;
-                    _spawnedCount = _spawnedCount + 1;
+                    // emptyPositions can over-count (FFV seats), so moveInCargo may silently
+                    // fail and strand the unit at _spawnPos. Verify it actually boarded; if not,
+                    // delete it and re-queue as overflow so it spawns fresh at the LZ instead.
+                    if (_unit in _vehicle) then {
+                        _squad pushBack _unit;
+                        _spawnedCount = _spawnedCount + 1;
+                    } else {
+                        deleteVehicle _unit;
+                        _overflowData pushBack [_unitClass, _unitLoadout];
+                    };
                 } else {
                     _overflowData pushBack [_unitClass, _unitLoadout];
                 };
@@ -832,8 +840,15 @@ switch (_category) do {
                 } forEach _squad;
             };
 
-            // Wait until everyone is out of the vehicle
-            waitUntil { sleep 0.5; ({alive _x && _x in _vehicle} count _squad) == 0 || !alive _vehicle };
+            // Wait until everyone is out — bounded by a 30s deadline so a unit stuck
+            // in a GetOut animation can't hang the whole thread (and block extraction).
+            private _dismountDeadline = serverTime + 30;
+            waitUntil { sleep 0.5; ({alive _x && _x in _vehicle} count _squad) == 0 || !alive _vehicle || serverTime > _dismountDeadline };
+
+            // Hard-eject any stragglers still aboard (animation glitch / blocked door)
+            if (alive _vehicle) then {
+                { if (alive _x && _x in _vehicle) then { unassignVehicle _x; moveOut _x; }; } forEach _squad;
+            };
 
             // --- DELAYED OVERFLOW SPAWN ---
             if (count _overflowData > 0) then {
@@ -843,6 +858,9 @@ switch (_category) do {
                     _x params ["_uClass", "_uLoadout"];
 
                     private _pos = _spawnCenter getPos [5 + random 10, random 360];
+                    // Nudge off geometry so overflow units don't spawn inside walls/objects
+                    private _safeOverflow = [_pos, 0, 12, 3, 0, 0.5, 0] call BIS_fnc_findSafePos;
+                    if (count _safeOverflow > 1) then { _pos = _safeOverflow; };
                     private _unit = _reinfGroup createUnit [_uClass, _pos, [], 0, "NONE"];
 
                     if (_uLoadout isNotEqualTo false) then {
@@ -888,38 +906,34 @@ switch (_category) do {
                 };
             };
 
-            // --- TRANSPORT EXTRACTION (2-MIN OVERWATCH, THEN RTB) ---
-            // Transport stays in COMBAT/RED for 2 minutes to provide turret cover for
-            // the dismounted squad, then disengages, restores mortality, and drives home.
+            // --- TRANSPORT EXTRACTION (LEAVE IMMEDIATELY ONCE EMPTY) ---
+            // No overwatch — the moment the squad is clear, the transport disengages,
+            // restores mortality, and drives straight home. The waitUntil doubles as a
+            // force-despawn watchdog: it deletes the vehicle on arrival OR at a hard
+            // deadline if it can't / won't make it back (stuck, immobilized, lost).
             [_vehicle, _vehGroup, _spawnPos] spawn {
                 params ["_vehicle", "_vehGroup", "_spawnPos"];
 
                 if (alive _vehicle) then {
-                    // 2-minute overwatch — transport uses its turret to cover troops
-                    _vehGroup setCombatMode "RED";
-                    _vehGroup setBehaviour "COMBAT";
-                    sleep 120;
+                    // Clear any leftover waypoints and head straight home, ignoring enemies
+                    while {(count (waypoints _vehGroup)) > 0} do { deleteWaypoint ((waypoints _vehGroup) select 0); };
+                    _vehGroup setBehaviour "CARELESS";
+                    _vehGroup setCombatMode "BLUE";
 
-                    if (alive _vehicle) then {
-                        // Clear combat waypoints and force RTB
-                        while {(count (waypoints _vehGroup)) > 0} do { deleteWaypoint ((waypoints _vehGroup) select 0); };
+                    private _wpAway = _vehGroup addWaypoint [_spawnPos, 0];
+                    _wpAway setWaypointType "MOVE";
+                    _wpAway setWaypointSpeed "FULL";
 
-                        private _wpAway = _vehGroup addWaypoint [_spawnPos, 0];
-                        _wpAway setWaypointType "MOVE";
-                        _wpAway setWaypointSpeed "FULL";
+                    // Restore mortality as it leaves the AO
+                    _vehicle allowDamage true;
+                    { _x allowDamage true; } forEach crew _vehicle;
 
-                        // Disengage and restore mortality as the transport leaves the AO
-                        _vehGroup setBehaviour "CARELESS";
-                        _vehGroup setCombatMode "BLUE";
-                        _vehicle allowDamage true;
-                        { _x allowDamage true; } forEach crew _vehicle;
+                    // Force-despawn watchdog: arrival OR hard 180s deadline
+                    private _deadline = serverTime + 180;
+                    waitUntil { sleep 5; (_vehicle distance2D _spawnPos) < 200 || !alive _vehicle || serverTime > _deadline };
 
-                        private _timeout = serverTime + 180;
-                        waitUntil { sleep 5; (_vehicle distance2D _spawnPos) < 200 || !alive _vehicle || serverTime > _timeout };
-
-                        { deleteVehicle _x } forEach crew _vehicle;
-                        deleteVehicle _vehicle;
-                    };
+                    { deleteVehicle _x } forEach crew _vehicle;
+                    deleteVehicle _vehicle;
                 };
             };
 
