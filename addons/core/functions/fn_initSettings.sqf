@@ -102,8 +102,8 @@ private _themeNames = [];
 // ==========================================
 
 // --- 0. Global Settings & Base Costs ---
-[ "AAS_Behavior_Infantry", "LIST", ["Infantry Behavior", "Global orders for all 6 Air/Ground Infantry supports."], ["AAS - Reinforcements", "0. Global Settings & Base Costs"], [[0, 1, 2], ["Follow Player", "Join Player", "Engage Nearest"], 0], 1 ] call CBA_fnc_addSetting;
-[ "AAS_Behavior_Armor", "LIST", ["Armor Behavior", "Global orders for all 3 Armor supports."], ["AAS - Reinforcements", "0. Global Settings & Base Costs"], [[0, 1, 2], ["Follow Player", "Join Player", "Engage Nearest"], 0], 1 ] call CBA_fnc_addSetting;
+[ "AAS_Behavior_Infantry", "LIST", ["Infantry Behavior", "Global orders for all 6 Air/Ground Infantry supports."], ["AAS - Reinforcements", "0. Global Settings & Base Costs"], [[0, 1, 2, 3], ["Follow Player", "Join Player", "Engage Nearest", "Join High Command Groups"], 0], 1 ] call CBA_fnc_addSetting;
+[ "AAS_Behavior_Armor", "LIST", ["Armor Behavior", "Global orders for all 3 Armor supports."], ["AAS - Reinforcements", "0. Global Settings & Base Costs"], [[0, 1, 2, 3], ["Follow Player", "Join Player", "Engage Nearest", "Join High Command Groups"], 0], 1 ] call CBA_fnc_addSetting;
 [ "AAS_Cost_Reinf_Custom", "EDITBOX", ["Base Cost: Custom / Free", "Used when 'Custom / Free' is selected."], ["AAS - Reinforcements", "0. Global Settings & Base Costs"], "0", 1 ] call CBA_fnc_addSetting;
 [ "AAS_Cost_Reinf_Antistasi", "EDITBOX", ["Base Cost: Antistasi", "Used for both Faction and Personal presets."], ["AAS - Reinforcements", "0. Global Settings & Base Costs"], "1500", 1 ] call CBA_fnc_addSetting;
 [ "AAS_Cost_Reinf_Overthrow", "EDITBOX", ["Base Cost: Overthrow", "Default Wallet funds."], ["AAS - Reinforcements", "0. Global Settings & Base Costs"], "9000", 1 ] call CBA_fnc_addSetting;

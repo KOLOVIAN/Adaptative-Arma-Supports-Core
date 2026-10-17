@@ -387,6 +387,11 @@ switch (_category) do {
                     private _wpSAD = _vehGroup addWaypoint [_dropPos, 0];
                     _wpSAD setWaypointType "SAD";
                 };
+                case 3: { // Join HC groups
+                    _vehGroup setBehaviour "AWARE";
+                    _vehGroup setCombatMode "YELLOW";
+                    _caller hcSetGroup [_vehGroup];
+                };
             };
 
             // --- RTB & DESPAWN ---
@@ -637,6 +642,11 @@ switch (_category) do {
                     _reinfGroup setBehaviour "COMBAT";
                     private _wpSAD = _reinfGroup addWaypoint [_dropPos, 0];
                     _wpSAD setWaypointType "SAD";
+                };
+                case 3: { // Join HC groups
+                    _reinfGroup setBehaviour "AWARE";
+                    _reinfGroup setCombatMode "YELLOW";
+                    _caller hcSetGroup [_reinfGroup];
                 };
             };
 
@@ -903,6 +913,11 @@ switch (_category) do {
                     _reinfGroup setBehaviour "COMBAT";
                     private _wpSAD = _reinfGroup addWaypoint [_dropPos, 0];
                     _wpSAD setWaypointType "SAD";
+                };
+                case 3: { // Join HC groups
+                    _reinfGroup setBehaviour "AWARE";
+                    _reinfGroup setCombatMode "YELLOW";
+                    _caller hcSetGroup [_reinfGroup];
                 };
             };
 
